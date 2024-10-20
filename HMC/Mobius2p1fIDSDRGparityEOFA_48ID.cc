@@ -555,9 +555,11 @@ int main(int argc, char **argv) {
 
   //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
   IntegratorParameters MD;
-  typedef ConjugateHMCRunnerD<MinimumNorm2> HMCWrapper; //NB: This is the "Omelyan integrator"
+  typedef ConjugateHMCRunnerD<Integrator> HMCWrapper; //NB: This is the "Omelyan integrator"
   typedef HMCWrapper::ImplPolicy GaugeImplPolicy;
-  MD.name    = std::string("MinimumNorm2");
+  MD.name    = { std::string("MinimumNorm2"),
+		 std::string("MinimumNorm2"),
+		 std::string("MinimumNorm2")} ;
   MD.MDsteps = user_params.Steps;
   MD.trajL   = user_params.TrajectoryLength;
 
@@ -647,9 +649,9 @@ int main(int argc, char **argv) {
   ////////////////////////////////////
   // Collect actions
   ////////////////////////////////////
-  ActionLevel<HMCWrapper::Field> Level1(1); //light quark + strange quark
-  ActionLevel<HMCWrapper::Field> Level2(4); //DSDR
-  ActionLevel<HMCWrapper::Field> Level3(2); //gauge
+  ActionLevel<HMCWrapper::Field> Level1(1,MinimumNorm2Integrator); //light quark + strange quark
+  ActionLevel<HMCWrapper::Field> Level2(4,MinimumNorm2Integrator); //DSDR
+  ActionLevel<HMCWrapper::Field> Level3(2,MinimumNorm2Integrator); //gauge
 
 
   /////////////////////////////////////////////////////////////

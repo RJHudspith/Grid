@@ -80,47 +80,6 @@ private:
   }
 };
 
-
-
-
-
-///////////////
-// macro for these
-
-template < class ImplementationPolicy, class RepresentationPolicy, class ReaderClass >
-class HMCLeapFrog: public HMCModule< GenericHMCRunnerTemplate<ImplementationPolicy, RepresentationPolicy, LeapFrog>, ReaderClass >{
-  typedef HMCModule< GenericHMCRunnerTemplate<ImplementationPolicy, RepresentationPolicy, LeapFrog>, ReaderClass  > HMCBaseMod;
-  using HMCBaseMod::HMCBaseMod;
-
-  // aquire resource
-  virtual void initialize(){
-    this->HMCPtr.reset(new GenericHMCRunnerTemplate<ImplementationPolicy, RepresentationPolicy, LeapFrog>(this->Par_) );
-  }
-};
-
-template < class ImplementationPolicy, class RepresentationPolicy, class ReaderClass >
-class HMCMinimumNorm2: public HMCModule< GenericHMCRunnerTemplate<ImplementationPolicy, RepresentationPolicy, MinimumNorm2>, ReaderClass  >{
-  typedef HMCModule< GenericHMCRunnerTemplate<ImplementationPolicy, RepresentationPolicy, MinimumNorm2>, ReaderClass  > HMCBaseMod;
-  using HMCBaseMod::HMCBaseMod;
-
-  // aquire resource
-  virtual void initialize(){
-    this->HMCPtr.reset(new GenericHMCRunnerTemplate<ImplementationPolicy, RepresentationPolicy, MinimumNorm2>(this->Par_));
-  }
-};
-
-
-template < class ImplementationPolicy, class RepresentationPolicy, class ReaderClass >
-class HMCForceGradient: public HMCModule< GenericHMCRunnerTemplate<ImplementationPolicy, RepresentationPolicy, ForceGradient>, ReaderClass  >{
-  typedef HMCModule< GenericHMCRunnerTemplate<ImplementationPolicy, RepresentationPolicy, ForceGradient>, ReaderClass   > HMCBaseMod;
-  using HMCBaseMod::HMCBaseMod;
-
-  // aquire resource
-  virtual void initialize(){
-    this->HMCPtr.reset(new GenericHMCRunnerTemplate<ImplementationPolicy, RepresentationPolicy, ForceGradient>(this->Par_) );
-  }
-};
-
 extern char hmc_string[];
 
 //////////////////////////////////////////////////////////////

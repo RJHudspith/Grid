@@ -172,7 +172,7 @@ int main(int argc, char **argv) {
 
   //  typedef GenericHMCRunner<LeapFrog> HMCWrapper; 
   //  typedef GenericHMCRunner<MinimumNorm2> HMCWrapper; 
-  typedef GenericHMCRunner<ForceGradient> HMCWrapper; 
+  typedef GenericHMCRunner<Integrator> HMCWrapper; 
 
   HMCparameters HMCparams;
   {
@@ -257,8 +257,8 @@ int main(int argc, char **argv) {
   ////////////////////////////////////
   // Collect actions
   ////////////////////////////////////
-  ActionLevel<HMCWrapper::Field> Level1(1);
-  ActionLevel<HMCWrapper::Field> Level2(16);
+  ActionLevel<HMCWrapper::Field> Level1(1,ForceGradientIntegrator);
+  ActionLevel<HMCWrapper::Field> Level2(16,ForceGradientIntegrator);
 
   ////////////////////////////////////
   // Strange action

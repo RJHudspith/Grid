@@ -52,8 +52,8 @@ int main(int argc, char **argv)
   //  MD.name    = std::string("Leap Frog");
   //  typedef GenericHMCRunner<ForceGradient> HMCWrapper;
   //  MD.name    = std::string("Force Gradient");
-  typedef GenericHMCRunner<MinimumNorm2> HMCWrapper;
-  MD.name    = std::string("MinimumNorm2");
+  typedef GenericHMCRunner<Integrator> HMCWrapper;
+  MD.name    = { std::string("MinimumNorm2"), std::string("MinimumNorm2")} ;
   MD.MDsteps = 24;
   MD.trajL   = 1.0;
 
@@ -135,8 +135,8 @@ int main(int argc, char **argv)
   ////////////////////////////////////
   // Collect actions
   ////////////////////////////////////
-  ActionLevel<HMCWrapper::Field> Level1(1);
-  ActionLevel<HMCWrapper::Field> Level2(2);
+  ActionLevel<HMCWrapper::Field> Level1(1,MinimumNorm2Integrator);
+  ActionLevel<HMCWrapper::Field> Level2(2,MinimumNorm2Integrator);
 
   ////////////////////////////////////
   // Strange action

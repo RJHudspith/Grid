@@ -1,38 +1,14 @@
 /*************************************************************************************
 
-Grid physics library, www.github.com/paboyle/Grid
+Go fuck yourself
 
-Source file: 
-
-Copyright (C) 2015-2016
-
-Author: Peter Boyle <pabobyle@ph.ed.ac.uk>
-Author: Guido Cossu
-Author: David Murphy
-
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along
-with this program; if not, write to the Free Software Foundation, Inc.,
-51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-
-See the full license in the file "LICENSE" in the top level distribution
-directory
-*************************************************************************************/
-/*  END LEGAL */
+**/
 #include <Grid/Grid.h>
 
-#ifdef GRID_DEFAULT_PRECISION_DOUBLE
 #define MIXED_PRECISION
-#endif
+
+#define EOFA_CHARM
+#define EOFA_STRANGE
 
 NAMESPACE_BEGIN(Grid);
 
@@ -89,12 +65,6 @@ NAMESPACE_BEGIN(Grid);
       SinglePrecGrid5(_sp_grid5),
       OuterLoopNormMult(100.) 
     { 
-      /* Debugging instances of objects; references are stored
-      std::cout << GridLogMessage << " Mixed precision CG wrapper LinOpF " <<std::hex<< &LinOpF<<std::dec <<std::endl;
-      std::cout << GridLogMessage << " Mixed precision CG wrapper LinOpD " <<std::hex<< &LinOpD<<std::dec <<std::endl;
-      std::cout << GridLogMessage << " Mixed precision CG wrapper FermOpF " <<std::hex<< &FermOpF<<std::dec <<std::endl;
-      std::cout << GridLogMessage << " Mixed precision CG wrapper FermOpD " <<std::hex<< &FermOpD<<std::dec <<std::endl;
-      */
     };
 
     void operator()(LinearOperatorBase<FieldD> &LinOpU, const FieldD &src, FieldD &psi) {
@@ -102,11 +72,6 @@ NAMESPACE_BEGIN(Grid);
       std::cout << GridLogMessage << " Mixed precision CG wrapper operator() "<<std::endl;
 
       SchurOperatorD * SchurOpU = static_cast<SchurOperatorD *>(&LinOpU);
-      
-      //      std::cout << GridLogMessage << " Mixed precision CG wrapper operator() FermOpU " <<std::hex<< &(SchurOpU->_Mat)<<std::dec <<std::endl;
-      //      std::cout << GridLogMessage << " Mixed precision CG wrapper operator() FermOpD " <<std::hex<< &(LinOpD._Mat) <<std::dec <<std::endl;
-      // Assumption made in code to extract gauge field
-      // We could avoid storing LinopD reference alltogether ?
       assert(&(SchurOpU->_Mat)==&(LinOpD._Mat));
 
       ////////////////////////////////////////////////////////////////////////////////////
@@ -121,9 +86,7 @@ NAMESPACE_BEGIN(Grid);
       GridBase * GridPtrD = FermOpD.Umu.Grid();
       GaugeFieldF     U_f  (GridPtrF);
       GaugeLinkFieldF Umu_f(GridPtrF);
-      //      std::cout << " Dim gauge field "<<GridPtrF->Nd()<<std::endl; // 4d
-      //      std::cout << " Dim gauge field "<<GridPtrD->Nd()<<std::endl; // 4d
-
+      
       ////////////////////////////////////////////////////////////////////////////////////
       // Moving this to a Clone method of fermion operator would allow to duplicate the 
       // physics parameters and decrease gauge field copies
@@ -138,23 +101,6 @@ NAMESPACE_BEGIN(Grid);
       pickCheckerboard(Odd ,FermOpF.UmuOdd ,FermOpF.Umu);
 
       ////////////////////////////////////////////////////////////////////////////////////
-      // Could test to make sure that LinOpF and LinOpD agree to single prec?
-      ////////////////////////////////////////////////////////////////////////////////////
-      /*
-      GridBase *Fgrid = psi._grid;
-      FieldD tmp2(Fgrid);
-      FieldD tmp1(Fgrid);
-      LinOpU.Op(src,tmp1);
-      LinOpD.Op(src,tmp2);
-      std::cout << " Double gauge field "<< norm2(FermOpD.Umu)<<std::endl;
-      std::cout << " Single gauge field "<< norm2(FermOpF.Umu)<<std::endl;
-      std::cout << " Test of operators "<<norm2(tmp1)<<std::endl;
-      std::cout << " Test of operators "<<norm2(tmp2)<<std::endl;
-      tmp1=tmp1-tmp2;
-      std::cout << " Test of operators diff "<<norm2(tmp1)<<std::endl;
-      */
-
-      ////////////////////////////////////////////////////////////////////////////////////
       // Make a mixed precision conjugate gradient
       ////////////////////////////////////////////////////////////////////////////////////
       MixedPrecisionConjugateGradient<FieldD,FieldF> MPCG(Tolerance,MaxInnerIterations,MaxOuterIterations,SinglePrecGrid5,LinOpF,LinOpD);
@@ -164,6 +110,7 @@ NAMESPACE_BEGIN(Grid);
   };
 
 NAMESPACE_END(Grid);
+
 
 int main(int argc, char **argv) {
   using namespace Grid;
@@ -185,25 +132,15 @@ int main(int argc, char **argv) {
   typedef Grid::XmlReader       Serialiser;
   
   //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-  IntegratorParameters MD;
-  //  typedef GenericHMCRunner<LeapFrog> HMCWrapper; 
-  //  MD.name    = std::string("Leap Frog");
-  typedef GenericHMCRunner<Integrator> HMCWrapper; 
-  MD.name    = { std::string("Force Gradient"),
-		 std::string("Force Gradient")} ;
-  //  typedef GenericHMCRunner<MinimumNorm2> HMCWrapper; 
-  //  MD.name    = std::string("MinimumNorm2");
-  MD.MDsteps = 6;
-  MD.trajL   = 1.0;
-  
+
+  typedef GenericHMCRunner<Integrator> HMCWrapper;
+
   HMCparameters HMCparams;
-  HMCparams.StartTrajectory  = 590;
-  HMCparams.Trajectories     = 1000;
-  HMCparams.NoMetropolisUntil=  0;
-  //  "[HotStart, ColdStart, TepidStart, CheckpointStart]\n";
-  //  HMCparams.StartingType     =std::string("ColdStart");
-  HMCparams.StartingType     =std::string("CheckpointStart");
-  HMCparams.MD = MD;
+  {
+    XmlReader HMCrd("HMCparameters.xml");
+    read(HMCrd,"HMCparameters",HMCparams);
+    std::cout << GridLogMessage<< HMCparams <<std::endl;
+  } 
   HMCWrapper TheHMC(HMCparams);
 
   // Grid from the command line arguments --grid and --mpi
@@ -212,7 +149,7 @@ int main(int argc, char **argv) {
   CheckpointerParameters CPparams;
   CPparams.config_prefix = "ckpoint_EODWF_lat";
   CPparams.rng_prefix    = "ckpoint_EODWF_rng";
-  CPparams.saveInterval  = 10;
+  CPparams.saveInterval  = 1;
   CPparams.format        = "IEEE64BIG";
   TheHMC.Resources.LoadNerscCheckpointer(CPparams);
 
@@ -227,16 +164,17 @@ int main(int argc, char **argv) {
   TheHMC.Resources.AddObservable<PlaqObs>();
   //////////////////////////////////////////////
 
-  const int Ls      = 16;
-  Real beta         = 2.13;
-  Real light_mass   = 0.01;
-  Real strange_mass = 0.04;
-  Real pv_mass      = 1.0;
-  RealD M5  = 1.8;
-  RealD b   = 1.0; 
-  RealD c   = 0.0;
+  const int Ls            = 10;
+  const Real beta         = 4.09;
+  const Real light_mass   = 0.010;
+  const Real strange_mass = 0.056;
+  const Real charm_mass   = 0.630;
+  const Real pv_mass      = 1.0;
+  const RealD M5          = 1.0;
+  const RealD b           = 1.5; 
+  const RealD c           = 0.5;
 
-  std::vector<Real> hasenbusch({ 0.1, 0.3, 0.6 });
+  std::vector<Real> hasenbusch( { 0.06, 0.4 } ) ;  
 
   auto GridPtr   = TheHMC.Resources.GetCartesian();
   auto GridRBPtr = TheHMC.Resources.GetRBCartesian();
@@ -247,12 +185,10 @@ int main(int argc, char **argv) {
   Coordinate mpi   = GridDefaultMpi();
   Coordinate simdF = GridDefaultSimd(Nd,vComplexF::Nsimd());
   Coordinate simdD = GridDefaultSimd(Nd,vComplexD::Nsimd());
-  auto GridPtrF   = SpaceTimeGrid::makeFourDimGrid(latt,simdF,mpi);
-  auto GridRBPtrF = SpaceTimeGrid::makeFourDimRedBlackGrid(GridPtrF);
-  auto FGridF     = SpaceTimeGrid::makeFiveDimGrid(Ls,GridPtrF);
-  auto FrbGridF   = SpaceTimeGrid::makeFiveDimRedBlackGrid(Ls,GridPtrF);
-
-  IwasakiGaugeActionR GaugeAction(beta);
+  auto GridPtrF    = SpaceTimeGrid::makeFourDimGrid(latt,simdF,mpi);
+  auto GridRBPtrF  = SpaceTimeGrid::makeFourDimRedBlackGrid(GridPtrF);
+  auto FGridF      = SpaceTimeGrid::makeFiveDimGrid(Ls,GridPtrF);
+  auto FrbGridF    = SpaceTimeGrid::makeFiveDimRedBlackGrid(Ls,GridPtrF);
 
   // temporarily need a gauge field
   LatticeGaugeField U(GridPtr);
@@ -263,19 +199,17 @@ int main(int argc, char **argv) {
   FermionAction::ImplParams Params(boundary);
   FermionActionF::ImplParams ParamsF(boundary);
   
-  double ActionStoppingCondition     = 1e-10;
-  double DerivativeStoppingCondition = 1e-6;
-  double MaxCGIterations = 30000;
+  const double ActionStoppingCondition     = 1e-10;
+  const double DerivativeStoppingCondition = 1e-7;
+  const double MaxCGIterations             = 30000;
 
   ////////////////////////////////////
   // Collect actions
   ////////////////////////////////////
-  ActionLevel<HMCWrapper::Field> Level1(1,ForceGradientIntegrator);
-  ActionLevel<HMCWrapper::Field> Level2(8,ForceGradientIntegrator);
+  ActionLevel<HMCWrapper::Field> Level1( HMCparams.MD.lvl_sizes[0] , IntStringToEnum( HMCparams.MD.name[0] ) );
+  ActionLevel<HMCWrapper::Field> Level2( HMCparams.MD.lvl_sizes[1] , IntStringToEnum( HMCparams.MD.name[1] ) );
+  ActionLevel<HMCWrapper::Field> Level3( HMCparams.MD.lvl_sizes[2] , IntStringToEnum( HMCparams.MD.name[2] ) );
 
-  ////////////////////////////////////
-  // Strange action
-  ////////////////////////////////////
   typedef SchurDiagMooeeOperator<FermionActionF,FermionFieldF> LinearOperatorF;
   typedef SchurDiagMooeeOperator<FermionAction ,FermionField > LinearOperatorD;
   typedef SchurDiagMooeeOperator<FermionEOFAActionF,FermionFieldF> LinearOperatorEOFAF;
@@ -284,25 +218,111 @@ int main(int argc, char **argv) {
   typedef MixedPrecisionConjugateGradientOperatorFunction<MobiusFermionD,MobiusFermionF,LinearOperatorD,LinearOperatorF> MxPCG;
   typedef MixedPrecisionConjugateGradientOperatorFunction<MobiusEOFAFermionD,MobiusEOFAFermionF,LinearOperatorEOFAD,LinearOperatorEOFAF> MxPCG_EOFA;
 
+  ////////////////////////////////////
+  // Charm action -- should we put this on level 2??? Maybe
+  ////////////////////////////////////
+  const int MX_inner = 5000;
+
+#ifdef EOFA_CHARM
+  OneFlavourRationalParams Charm_OFRp ;
+  Charm_OFRp.lo = 1.0 ;
+  Charm_OFRp.hi = 3.5 ;
+  Charm_OFRp.MaxIter = 10000 ;
+  Charm_OFRp.tolerance = 1E-9 ;
+  Charm_OFRp.degree = 4 ;
+  Charm_OFRp.precision = 50 ;
+
+  MobiusEOFAFermionD Charm_Op_L (U , *FGrid , *FrbGrid , *GridPtr , *GridRBPtr , charm_mass, charm_mass, pv_mass, 0.0, -1, M5, b, c);
+  MobiusEOFAFermionF Charm_Op_LF(UF, *FGridF, *FrbGridF, *GridPtrF, *GridRBPtrF, charm_mass, charm_mass, pv_mass, 0.0, -1, M5, b, c);
+  MobiusEOFAFermionD Charm_Op_R (U , *FGrid , *FrbGrid , *GridPtr , *GridRBPtr , pv_mass, charm_mass,    pv_mass, -1.0, 1, M5, b, c);
+  MobiusEOFAFermionF Charm_Op_RF(UF, *FGridF, *FrbGridF, *GridPtrF, *GridRBPtrF, pv_mass, charm_mass,    pv_mass, -1.0, 1, M5, b, c);
+
+  ConjugateGradient<FermionField> Charm_ActionCG(1E-14,MaxCGIterations);
+  ConjugateGradient<FermionField> Charm_DerivativeCG(1E-10,MaxCGIterations);
+
+  // Mixed precision EOFA
+  LinearOperatorEOFAD Charm_LinOp_L (Charm_Op_L);
+  LinearOperatorEOFAD Charm_LinOp_R (Charm_Op_R);
+  LinearOperatorEOFAF Charm_LinOp_LF(Charm_Op_LF);
+  LinearOperatorEOFAF Charm_LinOp_RF(Charm_Op_RF);
+
+  MxPCG_EOFA Charm_ActionCGL(1E-14,
+			     MX_inner,
+			     MaxCGIterations,
+			     GridPtrF,
+			     FrbGridF,
+			     Charm_Op_LF,Charm_Op_L,
+			     Charm_LinOp_LF,Charm_LinOp_L);
+
+  MxPCG_EOFA Charm_DerivativeCGL(DerivativeStoppingCondition,
+				 MX_inner,
+				 MaxCGIterations,
+				 GridPtrF,
+				 FrbGridF,
+				 Charm_Op_LF,Charm_Op_L,
+				 Charm_LinOp_LF,Charm_LinOp_L);
+  
+  MxPCG_EOFA Charm_ActionCGR(ActionStoppingCondition,
+			     MX_inner,
+			     MaxCGIterations,
+			     GridPtrF,
+			     FrbGridF,
+			     Charm_Op_RF,Charm_Op_R,
+			     Charm_LinOp_RF,Charm_LinOp_R);
+  
+  MxPCG_EOFA Charm_DerivativeCGR(DerivativeStoppingCondition,
+				 MX_inner,
+				 MaxCGIterations,
+				 GridPtrF,
+				 FrbGridF,
+				 Charm_Op_RF,Charm_Op_R,
+				 Charm_LinOp_RF,Charm_LinOp_R);
+  
+  ExactOneFlavourRatioPseudoFermionAction<FermionImplPolicy> 
+    Charm_EOFA(Charm_Op_L, Charm_Op_R, 
+	       Charm_ActionCG, 
+	       Charm_ActionCGL, Charm_ActionCGR,
+	       Charm_DerivativeCGL, Charm_DerivativeCGR,
+	       Charm_OFRp, true);
+#else
+  OneFlavourRationalParams Charm_OFRp;
+  Charm_OFRp.lo       = 0.1;
+  Charm_OFRp.hi       = 3.5;
+  Charm_OFRp.MaxIter  = 10000;
+  Charm_OFRp.tolerance= 1.0e-10;
+  Charm_OFRp.degree   = 5;
+  Charm_OFRp.precision= 50;
+
+  FermionAction CharmOp (U,*FGrid,*FrbGrid,*GridPtr,*GridRBPtr,charm_mass,M5,b,c, Params);
+  FermionAction CharmPauliVillarsOp(U,*FGrid,*FrbGrid,*GridPtr,*GridRBPtr,pv_mass,  M5,b,c, Params);
+
+  OneFlavourEvenOddRatioRationalPseudoFermionAction<FermionImplPolicy> \
+    Charm_EOFA(CharmPauliVillarsOp,CharmOp,Charm_OFRp);
+#endif
+  Charm_EOFA.is_smeared = true ;
+  Level1.push_back(&Charm_EOFA);
+  
+  ////////////////////////////////////
+  // Strange action
+  ////////////////////////////////////
+#ifdef EOFA_STRANGE
   // DJM: setup for EOFA ratio (Mobius)
   OneFlavourRationalParams OFRp;
-  OFRp.lo       = 0.1;
-  OFRp.hi       = 25.0;
+  OFRp.lo       = 0.75;
+  OFRp.hi       = 4.5;
   OFRp.MaxIter  = 10000;
   OFRp.tolerance= 1.0e-9;
-  OFRp.degree   = 14;
+  OFRp.degree   = 5 ;
   OFRp.precision= 50;
 
+  ConjugateGradient<FermionField> ActionCG(ActionStoppingCondition,MaxCGIterations);
+  ConjugateGradient<FermionField> DerivativeCG(DerivativeStoppingCondition,MaxCGIterations);
   
   MobiusEOFAFermionD Strange_Op_L (U , *FGrid , *FrbGrid , *GridPtr , *GridRBPtr , strange_mass, strange_mass, pv_mass, 0.0, -1, M5, b, c);
   MobiusEOFAFermionF Strange_Op_LF(UF, *FGridF, *FrbGridF, *GridPtrF, *GridRBPtrF, strange_mass, strange_mass, pv_mass, 0.0, -1, M5, b, c);
   MobiusEOFAFermionD Strange_Op_R (U , *FGrid , *FrbGrid , *GridPtr , *GridRBPtr , pv_mass, strange_mass,      pv_mass, -1.0, 1, M5, b, c);
   MobiusEOFAFermionF Strange_Op_RF(UF, *FGridF, *FrbGridF, *GridPtrF, *GridRBPtrF, pv_mass, strange_mass,      pv_mass, -1.0, 1, M5, b, c);
 
-  ConjugateGradient<FermionField>      ActionCG(ActionStoppingCondition,MaxCGIterations);
-  ConjugateGradient<FermionField>  DerivativeCG(DerivativeStoppingCondition,MaxCGIterations);
-#ifdef MIXED_PRECISION
-  const int MX_inner = 1000;
   // Mixed precision EOFA
   LinearOperatorEOFAD Strange_LinOp_L (Strange_Op_L);
   LinearOperatorEOFAD Strange_LinOp_R (Strange_Op_R);
@@ -348,14 +368,22 @@ int main(int argc, char **argv) {
 	 DerivativeCGL, DerivativeCGR,
 	 OFRp, true);
 #else
-  ExactOneFlavourRatioPseudoFermionAction<FermionImplPolicy> 
-    EOFA(Strange_Op_L, Strange_Op_R, 
-	 ActionCG,
-	 ActionCG, ActionCG,
-	 DerivativeCG, DerivativeCG, 
-	 OFRp, true);
+  OneFlavourRationalParams OFRp;
+  OFRp.lo       = 0.2;
+  OFRp.hi       = 4.5;
+  OFRp.MaxIter  = 10000;
+  OFRp.tolerance= 1.0e-10;
+  OFRp.degree   = 3;
+  OFRp.precision= 50;
+
+  FermionAction StrangeOp (U,*FGrid,*FrbGrid,*GridPtr,*GridRBPtr,strange_mass,M5,b,c, Params);
+  FermionAction StrangePauliVillarsOp(U,*FGrid,*FrbGrid,*GridPtr,*GridRBPtr,pv_mass,  M5,b,c, Params);
+
+  OneFlavourEvenOddRatioRationalPseudoFermionAction<FermionImplPolicy> \
+    EOFA(StrangePauliVillarsOp,StrangeOp,OFRp);
 #endif
-  Level1.push_back(&EOFA);
+  Level2.push_back(&EOFA);
+  EOFA.is_smeared = true ;
 
   ////////////////////////////////////
   // up down action
@@ -393,16 +421,18 @@ int main(int argc, char **argv) {
     Numerators.push_back  (new FermionAction(U,*FGrid,*FrbGrid,*GridPtr,*GridRBPtr,light_num[h],M5,b,c, Params));
     Denominators.push_back(new FermionAction(U,*FGrid,*FrbGrid,*GridPtr,*GridRBPtr,light_den[h],M5,b,c, Params));
 
-#ifdef MIXED_PRECISION
     ////////////////////////////////////////////////////////////////////////////
     // Mixed precision CG for 2f force
     ////////////////////////////////////////////////////////////////////////////
+    double DerivativeStoppingConditionLoose = 3e-7;
 
     DenominatorsF.push_back(new FermionActionF(UF,*FGridF,*FrbGridF,*GridPtrF,*GridRBPtrF,light_den[h],M5,b,c, ParamsF));
     LinOpD.push_back(new LinearOperatorD(*Denominators[h]));
     LinOpF.push_back(new LinearOperatorF(*DenominatorsF[h]));
 
-    MPCG.push_back(new MxPCG(DerivativeStoppingCondition,
+    double conv  = DerivativeStoppingCondition;
+    if (h<3) conv= DerivativeStoppingConditionLoose; // Relax on first two hasenbusch factors
+    MPCG.push_back(new MxPCG(conv,
 			     MX_inner,
 			     MaxCGIterations,
 			     GridPtrF,
@@ -420,35 +450,42 @@ int main(int argc, char **argv) {
 
     // Heatbath not mixed yet. As inverts numerators not so important as raised mass.
     Quotients.push_back (new TwoFlavourEvenOddRatioPseudoFermionAction<FermionImplPolicy>(*Numerators[h],*Denominators[h],*MPCG[h],*ActionMPCG[h],ActionCG));
-#else
-    ////////////////////////////////////////////////////////////////////////////
-    // Standard CG for 2f force
-    ////////////////////////////////////////////////////////////////////////////
-    Quotients.push_back   (new TwoFlavourEvenOddRatioPseudoFermionAction<FermionImplPolicy>(*Numerators[h],*Denominators[h],DerivativeCG,ActionCG));
-#endif
-
   }
 
   for(int h=0;h<n_hasenbusch+1;h++){
-    Level1.push_back(Quotients[h]);
+    Quotients[h] -> is_smeared = true ;
+    if( h > 0 ) {
+      Level2.push_back(Quotients[h]);
+    } else {
+      Level1.push_back(Quotients[h]);
+    }
   }
 
   /////////////////////////////////////////////////////////////
   // Gauge action
   /////////////////////////////////////////////////////////////
-  Level2.push_back(&GaugeAction);
+
   TheHMC.TheAction.push_back(Level1);
   TheHMC.TheAction.push_back(Level2);
+
+  SymanzikGaugeActionR GaugeAction(beta);
+  GaugeAction.is_smeared = false ;
+  Level3.push_back(&GaugeAction);
+  
+  TheHMC.TheAction.push_back(Level3);
   std::cout << GridLogMessage << " Action complete "<< std::endl;
 
   /////////////////////////////////////////////////////////////
   // HMC parameters are serialisable
 
+  //SmearingParameters SmPar(Reader);
+  double rho = 0.125;  // smearing parameter
+  int Nsmear = 8;    // number of smearing levels
+  Smear_Stout<HMCWrapper::ImplPolicy> Stout(rho);
+  SmearedConfiguration<HMCWrapper::ImplPolicy> SmearingPolicy(GridPtr, Nsmear, Stout);
+
   std::cout << GridLogMessage << " Running the HMC "<< std::endl;
-  TheHMC.Run();  // no smearing
+  TheHMC.Run(SmearingPolicy); // for smearing
 
   Grid_finalize();
 } // main
-
-
-

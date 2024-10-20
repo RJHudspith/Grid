@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<grid>
+  <HMCparameters>
+    <StartTrajectory>0</StartTrajectory>
+    <Trajectories>50</Trajectories>
+    <MetropolisTest>true</MetropolisTest>
+    <NoMetropolisUntil>20</NoMetropolisUntil>
+    <PerformRandomShift>true</PerformRandomShift>
+    <StartingType>TepidStart</StartingType>
+    <MD>
+      <name>
+	<elem>MinimumNorm2</elem>
+	<elem>MinimumNorm2</elem>
+	<elem>OMF4</elem>
+      </name>
+      <MDsteps>1</MDsteps>
+      <trajL>2</trajL>
+      <lvl_sizes>
+	<elem>3</elem>
+	<elem>1</elem>
+	<elem>1</elem>
+      </lvl_sizes>
+    </MD>
+  </HMCparameters>
+</grid>

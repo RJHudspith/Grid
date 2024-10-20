@@ -175,10 +175,7 @@ public:
     }
   }
 
-
-
   //////////////////////////////////////////////////////////////////
-
 private:
   template <class SmearingPolicy>
   void Runner(SmearingPolicy &Smearing) {
@@ -188,22 +185,21 @@ private:
     initializeGaugeFieldAndRNGs(U);
 
     typedef IntegratorType<SmearingPolicy> TheIntegrator;
-    TheIntegrator MDynamics(UGrid, Parameters.MD, TheAction, Smearing);
-
-    // Sets the momentum filter
-    MDynamics.setMomentumFilter(*(Resources.GetMomentumFilter()));
-
+    TheIntegrator MDynamics1(UGrid, Parameters.MD, TheAction, Smearing);
+    MDynamics1.setMomentumFilter(*(Resources.GetMomentumFilter()));
     Smearing.set_Field(U);
 
-    HybridMonteCarlo<TheIntegrator> HMC(Parameters, MDynamics,
-                                        Resources.GetSerialRNG(),
-                                        Resources.GetParallelRNG(), 
-                                        Resources.GetObservables(), U);
+    HybridMonteCarlo<TheIntegrator>
+      HMC(Parameters, MDynamics1,
+	  Resources.GetSerialRNG(),
+	  Resources.GetParallelRNG(), 
+	  Resources.GetObservables(), U);
 
     // Run it
     HMC.evolve();
   }
 };
+
 
 // These are for gauge fields, default integrator MinimumNorm2
 template <template <typename, typename, typename> class Integrator>
@@ -213,7 +209,6 @@ using GenericHMCRunnerF = HMCWrapperTemplate<PeriodicGimplF, Integrator>;
 template <template <typename, typename, typename> class Integrator>
 using GenericHMCRunnerD = HMCWrapperTemplate<PeriodicGimplD, Integrator>;
 
-
 // These are for gauge fields, default integrator MinimumNorm2
 template <template <typename, typename, typename> class Integrator>
 using ConjugateHMCRunner = HMCWrapperTemplate<ConjugateGimplR, Integrator>;
@@ -222,15 +217,12 @@ using ConjugateHMCRunnerF = HMCWrapperTemplate<ConjugateGimplF, Integrator>;
 template <template <typename, typename, typename> class Integrator>
 using ConjugateHMCRunnerD = HMCWrapperTemplate<ConjugateGimplD, Integrator>;
 
-
-
 template <class RepresentationsPolicy,
           template <typename, typename, typename> class Integrator>
 using GenericHMCRunnerHirep =
 				     HMCWrapperTemplate<PeriodicGimplR, Integrator, RepresentationsPolicy>;
 
 // sp2n
-
 template <template <typename, typename, typename> class Integrator>
 using GenericSpHMCRunner = HMCWrapperTemplate<SpPeriodicGimplR, Integrator>;
 
@@ -245,14 +237,18 @@ template <class Implementation, class RepresentationsPolicy,
           template <typename, typename, typename> class Integrator>
 using GenericHMCRunnerTemplate = HMCWrapperTemplate<Implementation, Integrator, RepresentationsPolicy>;
 
-typedef HMCWrapperTemplate<ScalarImplR, MinimumNorm2, ScalarFields>
+typedef HMCWrapperTemplate<ScalarImplR,
+			   Integrator,
+			   ScalarFields>
 ScalarGenericHMCRunner;
 
-typedef HMCWrapperTemplate<ScalarAdjImplR, MinimumNorm2, ScalarMatrixFields>
+typedef HMCWrapperTemplate<ScalarAdjImplR,
+			   Integrator,
+			   ScalarMatrixFields>
 ScalarAdjGenericHMCRunner;
 
 template <int Colours> 
-using ScalarNxNAdjGenericHMCRunner = HMCWrapperTemplate < ScalarNxNAdjImplR<Colours>, ForceGradient, ScalarNxNMatrixFields<Colours> >;
+using ScalarNxNAdjGenericHMCRunner = HMCWrapperTemplate < ScalarNxNAdjImplR<Colours>, Integrator, ScalarNxNMatrixFields<Colours> >;
 
 NAMESPACE_END(Grid);
 

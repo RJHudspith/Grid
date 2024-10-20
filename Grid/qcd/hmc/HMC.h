@@ -48,6 +48,7 @@ directory
 NAMESPACE_BEGIN(Grid);
 
 struct HMCparameters: Serializable {
+  
   GRID_SERIALIZABLE_CLASS_MEMBERS(HMCparameters,
                                   Integer, StartTrajectory,
                                   Integer, Trajectories, /* @brief Number of sweeps in this run */
@@ -59,11 +60,11 @@ struct HMCparameters: Serializable {
 
   HMCparameters() {
     ////////////////////////////// Default values
-    MetropolisTest    = true;
-    NoMetropolisUntil = 10;
-    StartTrajectory   = 0;
-    Trajectories      = 10;
-    StartingType      = "HotStart";
+    MetropolisTest     = true;
+    NoMetropolisUntil  = 10;
+    StartTrajectory    = 0;
+    Trajectories       = 10;
+    StartingType       = "HotStart";
     PerformRandomShift = true;
     /////////////////////////////////
   }
@@ -99,6 +100,7 @@ private:
 
   typedef typename IntegratorType::Field Field;
   typedef typename IntegratorType::FieldImplementation FieldImplementation;
+
   typedef std::vector< HmcObservable<Field> * > ObsListType;
 
   //pass these from the resource manager
@@ -107,7 +109,7 @@ private:
 
   Field &Ucur;
   
-  IntegratorType &TheIntegrator;
+  IntegratorType &TheIntegrator ;
   ObsListType Observables;
 
   /////////////////////////////////////////////////////////
@@ -227,7 +229,7 @@ private:
     std::cout.precision(15);
 
     std::cout << GridLogHMC << "--------------------------------------------------\n";
-    std::cout << GridLogHMC << "Total H after trajectory  = " << H1 << "  dH = " << H1 - H0 << "\n";
+    std::cout << GridLogHMC << "Total H after trajectory  = " << H1 << "  dH = " << H1-H0 << "\n";
     std::cout << GridLogHMC << "--------------------------------------------------\n";
 
     std::cout.precision(current_precision);
@@ -239,10 +241,13 @@ public:
   /////////////////////////////////////////
   // Constructor
   /////////////////////////////////////////
-  HybridMonteCarlo(HMCparameters _Pams, IntegratorType &_Int,
+  HybridMonteCarlo(HMCparameters _Pams,
+		   IntegratorType &_Int,
                    GridSerialRNG &_sRNG, GridParallelRNG &_pRNG, 
                    ObsListType _Obs, Field &_U)
-    : Params(_Pams), TheIntegrator(_Int), sRNG(_sRNG), pRNG(_pRNG), Observables(_Obs), Ucur(_U) {}
+    : Params(_Pams), TheIntegrator(_Int),sRNG(_sRNG), pRNG(_pRNG), Observables(_Obs), Ucur(_U) {
+
+  }
   ~HybridMonteCarlo(){};
 
   void evolve(void) {

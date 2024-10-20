@@ -36,6 +36,39 @@ NAMESPACE_BEGIN(Grid);
 // Indexing of tuple types
 //////////////////////////////////
 
+typedef enum { LeapFrogIntegrator ,
+	       MinimumNorm2Integrator ,
+	       ForceGradientIntegrator ,
+	       OMF4Integrator ,
+	       OMF4_5PIntegrator } SupportedIntegrator ;
+
+inline SupportedIntegrator
+IntStringToEnum( const std::string str )
+{
+  if( str == "LeapFrog" )      return LeapFrogIntegrator ;
+  if( str == "MinimumNorm2" )  return MinimumNorm2Integrator ;
+  if( str == "ForceGradient" ) return ForceGradientIntegrator ;
+  if( str == "OMF4" )          return OMF4Integrator;
+  if( str == "OMF4_5P" )       return OMF4_5PIntegrator ;
+  // shit the bed
+  assert( false ) ;
+  return MinimumNorm2Integrator ;
+}
+
+inline std::string
+IntEnumToString( const SupportedIntegrator Integrator )
+{
+  std::string str = "" ;
+  switch( Integrator ) {
+  case LeapFrogIntegrator :      str="Leapfrog"      ; break ;
+  case MinimumNorm2Integrator :  str="MinimumNorm2"  ; break ;
+  case ForceGradientIntegrator : str="ForceGradient" ; break ;
+  case OMF4Integrator :          str="OMF4"          ; break ;
+  case OMF4_5PIntegrator :       str="OMF4_5P"       ; break ;
+  }
+  return str ;
+}
+
 template <class T, class Tuple>
 struct Index;
 
@@ -57,9 +90,12 @@ struct Index<T, std::tuple<U, Types...>> {
 // (for multilevel integration schemes)
 ////////////////////////////////////////////
 
-template <class Field, class Repr = NoHirep >
+template <class Field,
+	  class Repr = NoHirep >
 struct ActionLevel {
 public:
+  //Integrator Int ;
+  
   unsigned int multiplier;
 
   // Fundamental repr actions separated because of the smearing
@@ -68,13 +104,15 @@ public:
   // construct a tuple of vectors of the actions for the corresponding higher
   // representation fields
   typedef typename AccessTypes<Action, Repr>::VectorCollection action_collection;
-  typedef typename  AccessTypes<Action, Repr>::FieldTypeCollection action_hirep_types;
+  typedef typename AccessTypes<Action, Repr>::FieldTypeCollection action_hirep_types;
 
   action_collection actions_hirep;
   std::vector<ActPtr>& actions;
+  SupportedIntegrator Integrator ;
 
-  explicit ActionLevel(unsigned int mul = 1) : 
-    actions(std::get<0>(actions_hirep)), multiplier(mul) {
+  explicit ActionLevel(unsigned int mul = 1,
+		       const SupportedIntegrator _Integrator = MinimumNorm2Integrator ) : 
+    actions(std::get<0>(actions_hirep)), multiplier(mul),Integrator(_Integrator) {
     // initialize the hirep vectors to zero.
     // apply(this->resize, actions_hirep, 0); //need a working resize
     assert(mul >= 1);

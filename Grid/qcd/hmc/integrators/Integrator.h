@@ -36,16 +36,22 @@ directory
 
 NAMESPACE_BEGIN(Grid);
 
+
+
 class IntegratorParameters: Serializable {
 public:
   GRID_SERIALIZABLE_CLASS_MEMBERS(IntegratorParameters,
-				  std::string, name,      // name of the integrator
+				  std::vector<std::string>, name,      // name of the integrator
 				  unsigned int, MDsteps,  // number of outer steps
-				  RealD, trajL)           // trajectory length
+				  RealD, trajL,           // trajectory length
+				  std::vector<int>, lvl_sizes )           
 
-  IntegratorParameters(int MDsteps_ = 10, RealD trajL_ = 1.0)
-  : MDsteps(MDsteps_),
-    trajL(trajL_) {};
+  IntegratorParameters( std::vector<std::string>name_ = {"MinimumNorm2","MinimumNorm2","MinimumNorm2","MinimumNorm2"},
+			int MDsteps_ = 1, RealD trajL_ = 1.0, std::vector<int> lvl_sizes_ = {1,1,1,1})
+  : name(name_),
+    MDsteps(MDsteps_),
+    trajL(trajL_) ,
+    lvl_sizes(lvl_sizes_) {};
 
   template <class ReaderClass, typename std::enable_if<isReader<ReaderClass>::value, int >::type = 0 >
   IntegratorParameters(ReaderClass & Reader)
@@ -55,10 +61,12 @@ public:
   }
 
   void print_parameters() const {
-    std::cout << GridLogMessage << "[Integrator] Type               : " << name << std::endl;
     std::cout << GridLogMessage << "[Integrator] Trajectory length  : " << trajL << std::endl;
     std::cout << GridLogMessage << "[Integrator] Number of MD steps : " << MDsteps << std::endl;
     std::cout << GridLogMessage << "[Integrator] Step size          : " << trajL/MDsteps << std::endl;
+    for( int i = 0 ; i < lvl_sizes.size() ; i++ ) {
+      std::cout << GridLogMessage << "[Integrator] lvl_" << i << " " << name[i] << " | Nsteps "<< lvl_sizes[i] << std::endl ;  
+    }
   }
 };
 
@@ -192,16 +200,17 @@ public:
 
   }
 
-  void update_U(Field& U, double ep) 
+  // this is the fucker
+  void update_U(Field& U, double ep,const bool must_smear=false) 
   {
-    update_U(P, U, ep);
+    update_U(P, U, ep,must_smear);
 
     t_U += ep;
     int fl = levels - 1;
     std::cout << GridLogIntegrator << "   " << "[" << fl << "] U " << " dt " << ep << " : t_U " << t_U << std::endl;
   }
   
-  void update_U(MomentaField& Mom, Field& U, double ep) 
+  void update_U(MomentaField& Mom, Field& U, double ep, const bool must_smear=false ) 
   {
     MomentaField MomFiltered(Mom.Grid());
     MomFiltered = Mom;
@@ -211,13 +220,15 @@ public:
     FieldImplementation::update_field(MomFiltered, U, ep);
 
     // Update the smeared fields, can be implemented as observer
-    Smearer.set_Field(U);
-
+    if( must_smear == true ) {
+      Smearer.set_Field(U);
+    }
+    
     // Update the higher representations fields
     Representations.update(U);  // void functions if fundamental representation
   }
 
-  virtual void step(Field& U, int level, int first, int last) = 0;
+  //virtual void step(Field& U, int level, int first, int last) = 0;
 
 public:
   Integrator(GridBase* grid, IntegratorParameters Par,
@@ -254,7 +265,7 @@ public:
     // Guido's design is at fault as per comment above in constructor
   }
 
-  virtual std::string integrator_name() = 0;
+  //virtual std::string integrator_name() = 0;
   
   //Set the momentum filter allowing for manipulation of the conjugate momentum
   void setMomentumFilter(const MomentumFilterBase<MomentaField> &filter){
@@ -352,7 +363,6 @@ public:
   
   void print_parameters()
   {
-    std::cout << GridLogMessage << "[Integrator] Name : "<< integrator_name() << std::endl;
     Params.print_parameters();
   }
 
@@ -375,6 +385,11 @@ public:
       }
     }
     std::cout << GridLogMessage << ":::::::::::::::::::::::::::::::::::::::::"<< std::endl;
+
+    std::cout << GridLogMessage << "[Integrator] Integrators on each level"<< std::endl;
+    for( int level = 0 ; level < (int)as.size() ; level++ ) {
+      std::cout << GridLogMessage << "[Integrator] lvl" << level << " Name: "<< IntEnumToString( as[level].Integrator ) << " -> " << as[level].Integrator<< std::endl;
+    }
   }
 
   void reverse_momenta()
@@ -538,9 +553,9 @@ public:
     }
 
     for (int stp = 0; stp < Params.MDsteps; ++stp) {  // MD step
-      int first_step = (stp == 0);
-      int last_step = (stp == Params.MDsteps - 1);
-      this->step(U, 0, first_step, last_step);
+      bool first_step = (stp == 0);
+      bool last_step = (stp == Params.MDsteps - 1);
+      stepper(U, 0, first_step, last_step);
     }
 
     // Check the clocks all match on all levels
@@ -553,9 +568,292 @@ public:
 
     // and that we indeed got to the end of the trajectory
     assert(fabs(t_U - Params.trajL) < 1.0e-6);
-
   }
 
+  // sometimes things are private and that is ok
+private :
+
+  // check if we need to actually reupdate the smeared field
+  // put in place so that we don't smear every step which is expensive
+  bool
+  smcheck( const int level )
+  {
+    bool must_smear = false ;
+    if( level == (int)(as.size() - 1) ) {
+      for( size_t i = 0 ; i < as[level].actions.size() ; i++ ) {
+	if( as[level].actions[i] -> is_smeared ) must_smear = true ;
+      }
+    }
+    return must_smear ;
+  }
+
+  // need a map for the stepsize with different integrators and possible stepsizes
+  // might as well recompute every time although it could easily be a lookup table
+  double
+  eps_tower( const int level ) {
+    double eps = Params.trajL/Params.MDsteps ;
+    int div = 1 ;
+    for (int l = 0; l <= level; ++l) {
+      // accounts for the implicit factor I hope
+      if( l > 0 ) {
+	switch( as[l-1].Integrator ) {
+	case LeapFrogIntegrator      : div = 1 ; break ;
+	case MinimumNorm2Integrator  : div = 2 ; break ;
+	case ForceGradientIntegrator : div = 2 ; break ;
+	case OMF4Integrator          : div = 5 ; break ;
+	case OMF4_5PIntegrator       : div = 5 ; break ;
+	}
+      }
+      eps /= (div*as[l].multiplier) ;
+    }
+    return eps ;
+  }
+
+  // generic Laphroig - don't use this
+  void
+  LeapStep( Field &U , const int level , const bool _first , const bool _last )
+  {
+    const int fl = as.size() - 1;
+    const RealD eps = eps_tower( level ) ;
+    const bool must_smear = smcheck(level) ;
+    const int multiplier = as[level].multiplier;
+    for (int e = 0; e < multiplier; ++e) {
+      const bool first_step = _first && (e == 0);
+      const bool last_step = _last && (e == multiplier - 1);
+      if (first_step == true) {  // initial half step
+        update_P(U, level, eps / 2.0);
+      }
+      if (level == fl) {  // lowest level
+        update_U(U, eps, (e==(multiplier-1)||must_smear));
+      } else {  // recursive function call
+        stepper(U, level + 1, first_step, last_step);
+      }
+      const int mm = (last_step==true) ? 1 : 2;
+      update_P(U, level, mm * eps / 2.0);
+    }
+  }
+
+  // Omelyan, Mryglod, Folk minimum norm guy
+  void
+  OMF2Step( Field &U , const int level , const bool _first , const bool _last )
+  {
+    ///////// Integrator Parameter //////////
+    const RealD lambda = 0.1931833275037836;
+    /////////////////////////////////////////
+    const int fl = as.size() - 1;
+    const RealD eps = eps_tower( level ) ;
+    const bool must_smear = smcheck(level) ;
+    const int multiplier = as[level].multiplier;
+    for (int e = 0; e < multiplier; ++e) {  // steps per step
+      const bool first_step = _first && (e == 0);
+      const bool last_step = _last && (e == multiplier - 1);
+      if (first_step == true ) {  // initial half step
+        update_P(U, level, lambda * eps);
+      }
+      if (level == fl) {  // lowest level
+        update_U(U, 0.5 * eps,must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, first_step, false);
+      }
+      update_P(U, level, (1.0 - 2.0 * lambda) * eps);
+      if (level == fl) {  // lowest level
+        update_U(U, 0.5 * eps, (e==(multiplier-1)||must_smear) );
+      } else {  // recursive function call
+        stepper(U, level + 1, false, last_step);
+      }
+      const int mm = (last_step == true) ? 1 : 2;
+      update_P(U, level, lambda * eps * mm);
+    }
+  }
+
+  // fourth order position OMF integrator from Takaishi and deForcrand
+  // good for the gauge field but has 4 fource calculations so expensive for other levels
+  void
+  OMF4Step( Field &U , const int level , const bool _first , const bool _last )
+  {
+    //////// Integrator Parameters ////////////
+    const RealD Lambda =  0.7123418310626056 ;
+    const RealD Rho    =  0.1786178958448091 ;
+    const RealD Theta  = -0.06626458266981843 ;
+    ///////////////////////////////////////////
+    const int fl = as.size() - 1;
+    const RealD eps = eps_tower( level ) ;    
+    const bool must_smear = smcheck( level ) ;
+    const int multiplier = as[level].multiplier;
+    for (int e = 0; e < multiplier; ++e) {  // steps per step
+      const bool first_step = _first && (e == 0);
+      const bool last_step = _last && (e == multiplier - 1);
+      if (level == fl) {  // lowest level
+        update_U(U, Rho*eps,must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, first_step, false);
+      }
+      update_P(U, level, Lambda*eps );
+      if (level == fl) {  // lowest level
+        update_U(U, Theta*eps,must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, false, false);
+      }
+      update_P(U, level, (1.-2.*Lambda)*0.5*eps );
+      if (level == fl) {  // lowest level
+        update_U(U, (1-2*(Theta+Rho))*eps,must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, false, false);
+      }
+      update_P(U, level, (1.-2.*Lambda)*0.5*eps );
+      if (level == fl) {  // lowest level
+        update_U(U, Theta*eps,must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, false, false);
+      }
+      update_P(U, level, Lambda*eps );
+      if (level == fl) {  // lowest level
+        update_U(U, Rho*eps,(e==(multiplier-1)||must_smear)) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, false, last_step);
+      }
+    }
+  }
+
+  // fourth order position OMF integrator from Takaishi and deForcrand
+  // good for the gauge field but has 4 fource calculations so expensive for other levels
+  void
+  OMF4_P5Step( Field &U , const int level , const bool _first , const bool _last )
+  {
+    //////// Integrator Parameters ////////////
+    const RealD Theta  =  0.08398315262876693 ;
+    const RealD Rho    =  0.2539785108410595  ;
+    const RealD Lambda =  0.6822365335719091  ;
+    const RealD Mu     = -0.03230286765269967 ;
+    ///////////////////////////////////////////
+    const int fl = as.size() - 1;
+    const RealD eps = eps_tower( level ) ;    
+    const bool must_smear = smcheck( level ) ;
+    const int multiplier = as[level].multiplier;
+    for (int e = 0; e < multiplier; ++e) {  // steps per step
+      const bool first_step = _first && (e == 0);
+      const bool last_step = _last && (e == multiplier - 1);
+      if (level == fl) {  // lowest level
+        update_U(U, Theta*eps,must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, first_step, false);
+      }
+      update_P(U, level, Rho * eps);
+      if (level == fl) {  // lowest level
+        update_U(U, Lambda*eps,must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, false, false);
+      }
+      update_P(U, level, Mu * eps);
+      if (level == fl) {  // lowest level
+        update_U(U, (1.0-2.0*(Lambda+Theta))*0.5*eps,must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, false, false);
+      }
+      update_P(U, level, (1.0 - 2.0 * (Mu+Rho)) * eps);
+      if (level == fl) {  // lowest level
+        update_U(U, (1.0-2.0*(Lambda+Theta))*0.5*eps , must_smear );
+      } else {  // recursive function call
+	stepper(U, level + 1, false, false);
+      }
+      update_P(U, level, Mu * eps);
+      if (level == fl) {  // lowest level
+        update_U(U, Lambda*eps,must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, false, false);
+      }
+      update_P(U, level, Rho * eps );
+      if (level == fl) {  // lowest level
+        update_U(U, Theta*eps,(e==(multiplier-1)||must_smear)) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, false, last_step);
+      }
+    }
+  }
+
+  void
+  FG_update_P( Field& U,
+	       const int level,
+	       const double fg_dt,
+	       const double ep,
+	       const bool must_smear )
+  {
+    Field Ufg(U.Grid()), Pfg(U.Grid());
+    Ufg = U;
+    Pfg = Zero();
+    std::cout << GridLogIntegrator << "FG update " << fg_dt << " " << ep << std::endl;
+    // prepare_fg; no prediction/result cache for now
+    // could relax CG stopping conditions for the
+    // derivatives in the small step since the force gets multiplied by
+    // a tiny dt^2 term relative to main force.
+    //
+    // Presently 4 force evals, and should have 3, so 1.33x too expensive.
+    // could reduce this with sloppy CG to perhaps 1.15x too expensive
+    // even without prediction.
+    update_P(Pfg, Ufg, level, fg_dt);
+    Pfg = Pfg*(1.0/fg_dt);
+    update_U(Pfg, Ufg, fg_dt,must_smear);
+    update_P(Ufg, level, ep);
+  }
+
+  // force gradient integrator is supposedly better than OMF2 but my test indicated otherwise
+  void
+  FGStep( Field &U , const int level , const bool _first , const bool _last )
+  {
+    const RealD lambda = 1.0/6.0, chi = 1.0/72.0, xi = 0.0, theta = 0.0;
+    const int fl = as.size() - 1;
+    const RealD eps = eps_tower( level ) ;
+    const RealD Chi = chi * eps * eps * eps;
+    const bool must_smear = smcheck(level) ;
+    const int multiplier = as[level].multiplier;
+    for (int e = 0; e < multiplier; ++e) {  // steps per step
+      const bool first_step = _first && (e == 0);
+      const bool last_step = _last && (e == multiplier - 1);
+      if( first_step == true ) {  // initial half step
+        update_P(U, level, lambda * eps);
+      }
+      if( level == fl ) {  // lowest level
+        update_U(U, 0.5 * eps,must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, first_step , false );
+      }
+      FG_update_P(U, level, 2 * Chi / ((1.0 - 2.0 * lambda) * eps),
+		  (1.0 - 2.0 * lambda) * eps,must_smear );
+      if (level == fl) {  // lowest level
+        update_U(U, 0.5 * eps, (e==(multiplier-1)||must_smear)) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, false, last_step);
+      }
+      const int mm = (last_step==true) ? 1 : 2;
+      update_P(U, level, lambda * eps * mm);
+    }
+  }
+
+  // switch for the integrator we are recursing at this level allows for different
+  // integrators at each level
+  void stepper( Field &U , const int level , const bool _first , const bool _last )
+  {
+    switch( as[level].Integrator ) {
+    case LeapFrogIntegrator :
+      std::cout<<"Stepping down LeapStep"<<std::endl ;
+      return LeapStep( U , level , _first , _last ) ;
+    case MinimumNorm2Integrator :
+      std::cout<<"Stepping down OMF2"<<std::endl ;
+      return OMF2Step( U , level , _first , _last ) ;
+    case ForceGradientIntegrator :
+      std::cout<<"Stepping down FG"<<std::endl ;
+      return FGStep( U , level , _first , _last ) ;
+    case OMF4Integrator :
+      std::cout<<"Stepping down OMF4"<<std::endl ;
+      return OMF4Step( U , level , _first , _last ) ;
+    case OMF4_5PIntegrator :
+      std::cout<<"Stepping down OMF4_5P"<<std::endl ;
+      return OMF4_P5Step( U , level , _first , _last ) ;
+    default :
+      assert( "I Do not recognise Integrator" ) ;
+      return ;
+    }
+  }
 };
 
 NAMESPACE_END(Grid);

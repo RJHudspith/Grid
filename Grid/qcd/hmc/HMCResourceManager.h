@@ -168,8 +168,6 @@ public:
 
     Read.pop();
   }
-
-
  
   template <class RepresentationPolicy>
   void GetActionSet(ActionSet<typename ImplementationPolicy::Field, RepresentationPolicy>& Aset){
@@ -180,8 +178,6 @@ public:
       Aset[(*it).first-1].push_back((*it).second->getPtr());
     }
   }
-
-
 
   //////////////////////////////////////////////////////////////
   // Grids
@@ -313,8 +309,6 @@ public:
     return out;
   }
 
-
-
 private:
   // this private
   template <class ReaderClass >
@@ -337,9 +331,6 @@ private:
     Read.pop();
 
   }
-
-
-
 };
 
 NAMESPACE_END(Grid);

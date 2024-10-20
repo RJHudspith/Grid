@@ -51,8 +51,10 @@ int main(int argc, char **argv) {
   IntegratorParameters MD;
   //  typedef GenericHMCRunner<LeapFrog> HMCWrapper;
   //  MD.name    = std::string("Leap Frog");
-  typedef GenericHMCRunner<ForceGradient> HMCWrapper;
-  MD.name    = std::string("Force Gradient");
+  typedef GenericHMCRunner<Integrator> HMCWrapper;
+  MD.name    = { std::string("Force Gradient"),
+		 std::string("Force Gradient"),
+		 std::string("Force Gradient")} ;
   //typedef GenericHMCRunner<MinimumNorm2> HMCWrapper;
   // MD.name    = std::string("MinimumNorm2");
   // TrajL = 2
@@ -217,9 +219,9 @@ int main(int argc, char **argv) {
   ////////////////////////////////////
   // Collect actions
   ////////////////////////////////////
-  ActionLevel<HMCWrapper::Field> Level1(1);
-  ActionLevel<HMCWrapper::Field> Level2(3);
-  ActionLevel<HMCWrapper::Field> Level3(15);
+  ActionLevel<HMCWrapper::Field> Level1(1,ForceGradientIntegrator);
+  ActionLevel<HMCWrapper::Field> Level2(3,ForceGradientIntegrator);
+  ActionLevel<HMCWrapper::Field> Level3(15,ForceGradientIntegrator);
 
   ////////////////////////////////////
   // Strange action
