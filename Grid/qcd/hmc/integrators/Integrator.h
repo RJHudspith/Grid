@@ -594,14 +594,14 @@ private :
     double eps = Params.trajL/Params.MDsteps ;
     int div = 1 ;
     for (int l = 0; l <= level; ++l) {
-      // accounts for the implicit factor I hope
+      // list of number of step-downs (U-updates) we have
       if( l > 0 ) {
 	switch( as[l-1].Integrator ) {
 	case LeapFrogIntegrator      : div = 1 ; break ;
 	case MinimumNorm2Integrator  : div = 2 ; break ;
 	case ForceGradientIntegrator : div = 2 ; break ;
 	case OMF4Integrator          : div = 5 ; break ;
-	case OMF4_5PIntegrator       : div = 5 ; break ;
+	case OMF4_5PIntegrator       : div = 6 ; break ;
 	}
       }
       eps /= (div*as[l].multiplier) ;

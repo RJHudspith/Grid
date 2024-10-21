@@ -1,8 +1,6 @@
-/*************************************************************************************
-
-Go fuck yourself
-
-**/
+/**
+   2+1+1 Mixed Precision EOFA Mobius with a tonne of smearing
+ **/
 #include <Grid/Grid.h>
 
 #define MIXED_PRECISION
