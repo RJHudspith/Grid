@@ -39,8 +39,11 @@ NAMESPACE_BEGIN(Grid);
 typedef enum { LeapFrogIntegrator ,
 	       MinimumNorm2Integrator ,
 	       ForceGradientIntegrator ,
+	       OMF2_QPQPQ,
 	       OMF4Integrator ,
-	       OMF4_5PIntegrator } SupportedIntegrator ;
+	       OMF4VIntegrator ,
+	       OMF4_5PIntegrator,
+	       OMF4_5VIntegrator } SupportedIntegrator ;
 
 inline SupportedIntegrator
 IntStringToEnum( const std::string str )
@@ -48,8 +51,11 @@ IntStringToEnum( const std::string str )
   if( str == "LeapFrog" )      return LeapFrogIntegrator ;
   if( str == "MinimumNorm2" )  return MinimumNorm2Integrator ;
   if( str == "ForceGradient" ) return ForceGradientIntegrator ;
+  if( str == "OMF2_QPQPQ" )    return OMF2_QPQPQ ;
   if( str == "OMF4" )          return OMF4Integrator;
+  if( str == "OMF4V" )         return OMF4VIntegrator;
   if( str == "OMF4_5P" )       return OMF4_5PIntegrator ;
+  if( str == "OMF4_5V" )       return OMF4_5VIntegrator ;
   // shit the bed
   assert( false ) ;
   return MinimumNorm2Integrator ;
@@ -63,8 +69,11 @@ IntEnumToString( const SupportedIntegrator Integrator )
   case LeapFrogIntegrator :      str="Leapfrog"      ; break ;
   case MinimumNorm2Integrator :  str="MinimumNorm2"  ; break ;
   case ForceGradientIntegrator : str="ForceGradient" ; break ;
+  case OMF2_QPQPQ :              str="OMF2_QPQPQ"    ; break ;
   case OMF4Integrator :          str="OMF4"          ; break ;
+  case OMF4VIntegrator :         str="OMF4V"         ; break ;
   case OMF4_5PIntegrator :       str="OMF4_5P"       ; break ;
+  case OMF4_5VIntegrator :       str="OMF4_5V"       ; break ;
   }
   return str ;
 }

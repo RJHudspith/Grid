@@ -600,7 +600,10 @@ private :
 	case LeapFrogIntegrator      : div = 1 ; break ;
 	case MinimumNorm2Integrator  : div = 2 ; break ;
 	case ForceGradientIntegrator : div = 2 ; break ;
+	case OMF2_QPQPQ              : div = 3 ; break ;
+	case OMF4VIntegrator         : div = 4 ; break ;
 	case OMF4Integrator          : div = 5 ; break ;
+	case OMF4_5VIntegrator       : div = 5 ; break ;
 	case OMF4_5PIntegrator       : div = 6 ; break ;
 	}
       }
@@ -633,7 +636,42 @@ private :
     }
   }
 
-  // Omelyan, Mryglod, Folk minimum norm guy
+  // Omelyan, Mryglod, Folk minimum norm guy needs two forces but 3 dips down
+  // Should have the same base efficieny as the PQPQP below
+  void
+  OMF2Step_QPQPQ( Field &U , const int level , const bool _first , const bool _last )
+  {
+    ///////// Integrator Parameter //////////
+    const RealD lambda = 0.1931833275037836;
+    /////////////////////////////////////////
+    const int fl = as.size() - 1;
+    const RealD eps = eps_tower( level ) ;
+    const bool must_smear = smcheck(level) ;
+    const int multiplier = as[level].multiplier;
+    for (int e = 0; e < multiplier; ++e) {  // steps per step
+      const bool first_step = _first && (e == 0);
+      const bool last_step = _last && (e == multiplier - 1);
+      if (level == fl) {  // lowest level
+        update_U(U, lambda*eps,must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level+1, first_step, false);
+      }
+      update_P(U, level, 0.5*eps);
+      if (level == fl) {  // lowest level
+        update_U(U, (1-2*lambda)*eps, must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level+1, false, false);
+      }
+      update_P(U, level, 0.5*eps);
+      if (level == fl) {  // lowest level
+        update_U(U, lambda*eps,(e==(multiplier-1)||must_smear) ) ;
+      } else {  // recursive function call
+        stepper(U, level+1, false, last_step);
+      }
+    }
+  }
+
+  // Omelyan, Mryglod, Folk minimum norm guy PQPQP -- 3 forces per step and 2 recursions
   void
   OMF2Step( Field &U , const int level , const bool _first , const bool _last )
   {
@@ -666,14 +704,15 @@ private :
     }
   }
 
-  // fourth order position OMF integrator from Takaishi and deForcrand
-  // good for the gauge field but has 4 fource calculations so expensive for other levels
+  // fourth order position OMF integrator from the paper
+  // this and the one below have low efficiency compared to the brutes at the
+  // bottom but they have fewer force evaluations
   void
   OMF4Step( Field &U , const int level , const bool _first , const bool _last )
   {
-    //////// Integrator Parameters ////////////
-    const RealD Lambda =  0.7123418310626056 ;
+    //////// Position parameters //////////////
     const RealD Rho    =  0.1786178958448091 ;
+    const RealD Lambda =  0.7123418310626056 ;
     const RealD Theta  = -0.06626458266981843 ;
     ///////////////////////////////////////////
     const int fl = as.size() - 1;
@@ -715,10 +754,60 @@ private :
     }
   }
 
-  // fourth order position OMF integrator from Takaishi and deForcrand
-  // good for the gauge field but has 4 fource calculations so expensive for other levels
+  // same as above but for the velocity version
+  // ok for the gauge field but has one more force determination compared to
+  // above with very little to justify it
   void
-  OMF4_P5Step( Field &U , const int level , const bool _first , const bool _last )
+  OMF4VStep( Field &U , const int level , const bool _first , const bool _last )
+  {
+    // velocity version parameters
+    const RealD Rho    = 0.1644986515575760 ;
+    const RealD Lambda = 0.5209433391039899 ;
+    const RealD Theta  = 1.2356926511389169 ;
+    ///////////////////////////////////////////
+    const int fl = as.size() - 1;
+    const RealD eps = eps_tower( level ) ;    
+    const bool must_smear = smcheck( level ) ;
+    const int multiplier = as[level].multiplier;
+    for (int e = 0; e < multiplier; ++e) {  // steps per step
+      const bool first_step = _first && (e == 0);
+      const bool last_step = _last && (e == multiplier - 1);
+      if (first_step == true ) {  // initial half step
+        update_P(U, level, Rho*eps);
+      }
+      if (level == fl) {  // lowest level
+        update_U(U, Lambda*eps,must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, false, false);
+      }
+      update_P(U, level, Theta*eps);
+      if (level == fl) {  // lowest level
+        update_U(U, (1-2.*Lambda)*0.5*eps,must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, false, false);
+      }
+      update_P(U, level,(1-2*(Theta+Rho))*eps);
+      if (level == fl) {  // lowest level
+        update_U(U, (1-2.*Lambda)*0.5*eps,must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, false, false);
+      }
+      update_P(U, level, Theta*eps);
+      if (level == fl) {  // lowest level
+        update_U(U, Lambda*eps, (e==(multiplier-1)||must_smear) ) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, false, last_step);
+      }
+      const int mm = (last_step == true) ? 1 : 2;
+      update_P(U, level, Rho*eps * mm);
+    }
+  }
+
+  // fourth order velocity-verlet from the OMF paper - this integrator is really something
+  // as it was several orders of magnitude better than the other ones here - still O(t^4) but
+  // with a tiny coefficient
+  void
+  OMF4_V5Step( Field &U , const int level , const bool _first , const bool _last )
   {
     //////// Integrator Parameters ////////////
     const RealD Theta  =  0.08398315262876693 ;
@@ -726,6 +815,61 @@ private :
     const RealD Lambda =  0.6822365335719091  ;
     const RealD Mu     = -0.03230286765269967 ;
     ///////////////////////////////////////////
+    const int fl = as.size() - 1;
+    const RealD eps = eps_tower( level ) ;    
+    const bool must_smear = smcheck( level ) ;
+    const int multiplier = as[level].multiplier;
+    for (int e = 0; e < multiplier; ++e) {  // steps per step
+      const bool first_step = _first && (e == 0);
+      const bool last_step = _last && (e == multiplier - 1);
+      if (first_step == true ) {  // initial half step
+        update_P(U, level, Theta*eps);
+      }
+      if (level == fl) {  // lowest level
+        update_U(U, Rho*eps,must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, first_step, false);
+      }
+      update_P(U, level, Lambda*eps);
+      if (level == fl) {  // lowest level
+        update_U(U, Mu*eps,must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, false, false);
+      }
+      update_P(U, level, (1.0-2.0*(Lambda+Theta))*0.5*eps);
+      if (level == fl) {  // lowest level
+        update_U(U, (1.0 - 2.0 * (Mu+Rho)) * eps ,must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, false, false);
+      }
+      update_P(U, level, (1.0-2.0*(Lambda+Theta))*0.5*eps);
+      if (level == fl) {  // lowest level
+        update_U(U, Mu*eps,must_smear) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, false, false);
+      }
+      update_P(U, level, Lambda*eps);
+      if (level == fl) {  // lowest level
+        update_U(U, Rho*eps, (e==(multiplier-1)||must_smear)) ;
+      } else {  // recursive function call
+        stepper(U, level + 1, false, last_step );
+      }
+      const int mm = (last_step == true) ? 1 : 2;
+      update_P(U, level, Theta * eps * mm);
+    }
+  }
+
+  // fourth order position method with 0 force gradients - parameters from the OMF paper
+  // only 5 forces compared to the 6 needed above but worse dH behaviour!
+  void
+  OMF4_P5Step( Field &U , const int level , const bool _first , const bool _last )
+  {
+    //////// Integrator Parameters are for the velocity guy which is not correct!!! ////////////
+    const RealD Theta  =  0.08398315262876693 ;
+    const RealD Rho    =  0.2539785108410595  ;
+    const RealD Lambda =  0.6822365335719091  ;
+    const RealD Mu     = -0.03230286765269967 ;
+    /////////////////////////////////////////////////////////////////////////////////////////
     const int fl = as.size() - 1;
     const RealD eps = eps_tower( level ) ;    
     const bool must_smear = smcheck( level ) ;
@@ -840,15 +984,24 @@ private :
     case MinimumNorm2Integrator :
       std::cout<<"Stepping down OMF2"<<std::endl ;
       return OMF2Step( U , level , _first , _last ) ;
+    case OMF2_QPQPQ :
+      std::cout<<"Stepping down OMF2 QPQPQPQ"<<std::endl ;
+      return OMF2Step_QPQPQ( U , level , _first , _last ) ;
     case ForceGradientIntegrator :
       std::cout<<"Stepping down FG"<<std::endl ;
       return FGStep( U , level , _first , _last ) ;
     case OMF4Integrator :
       std::cout<<"Stepping down OMF4"<<std::endl ;
       return OMF4Step( U , level , _first , _last ) ;
+    case OMF4VIntegrator :
+      std::cout<<"Stepping down OMF4V"<<std::endl ;
+      return OMF4VStep( U , level , _first , _last ) ;
     case OMF4_5PIntegrator :
       std::cout<<"Stepping down OMF4_5P"<<std::endl ;
       return OMF4_P5Step( U , level , _first , _last ) ;
+    case OMF4_5VIntegrator :
+      std::cout<<"Stepping down OMF4_5V"<<std::endl ;
+      return OMF4_V5Step( U , level , _first , _last ) ;
     default :
       assert( "I Do not recognise Integrator" ) ;
       return ;
