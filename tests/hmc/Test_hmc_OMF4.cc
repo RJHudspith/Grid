@@ -36,14 +36,15 @@ int main(int argc, char **argv) {
   // here make a routine to print all the relevant information on the run
   std::cout << GridLogMessage << "Grid is setup to use " << threads << " threads" << std::endl;
 
-  SupportedIntegrator Inter[ 7 ] =
+  SupportedIntegrator Inter[ 9 ] =
     {
-      MinimumNorm2Integrator, ForceGradientIntegrator, OMF2_QPQPQ ,
-      OMF4Integrator , OMF4VIntegrator ,
-      OMF4_5PIntegrator , OMF4_5VIntegrator
+      OMF2_3StepVIntegrator, OMF2_3StepPIntegrator,
+      OMF2_5StepVIntegrator, OMF2_5StepPIntegrator, ForceGradientIntegrator,
+      OMF4_9StepVIntegrator, OMF4_9StepPIntegrator,
+      OMF4_11StepVIntegrator, OMF4_11StepPIntegrator,
     } ;
 
-  for( int i = 0 ; i < 7 ; i++ ) {
+  for( int i = 0 ; i < 9 ; i++ ) {
     for(double t=1.0; t>1E-2;t*=0.5 ) {
 
       // Checkpointer definition

@@ -32,33 +32,32 @@ directory
 
 NAMESPACE_BEGIN(Grid);
 
-//////////////////////////////////
-// Indexing of tuple types
-//////////////////////////////////
-
-typedef enum { LeapFrogIntegrator ,
-	       MinimumNorm2Integrator ,
-	       ForceGradientIntegrator ,
-	       OMF2_QPQPQ,
-	       OMF4Integrator ,
-	       OMF4VIntegrator ,
-	       OMF4_5PIntegrator,
-	       OMF4_5VIntegrator } SupportedIntegrator ;
+// Ignore the 7step guys because they don't have the potential to be good
+typedef enum { ForceGradientIntegrator ,
+	       OMF2_3StepVIntegrator ,
+	       OMF2_3StepPIntegrator ,
+	       OMF2_5StepVIntegrator,
+	       OMF2_5StepPIntegrator,
+	       OMF4_9StepVIntegrator,
+	       OMF4_9StepPIntegrator,
+	       OMF4_11StepVIntegrator,
+	       OMF4_11StepPIntegrator } SupportedIntegrator ;
 
 inline SupportedIntegrator
 IntStringToEnum( const std::string str )
 {
-  if( str == "LeapFrog" )      return LeapFrogIntegrator ;
-  if( str == "MinimumNorm2" )  return MinimumNorm2Integrator ;
   if( str == "ForceGradient" ) return ForceGradientIntegrator ;
-  if( str == "OMF2_QPQPQ" )    return OMF2_QPQPQ ;
-  if( str == "OMF4" )          return OMF4Integrator;
-  if( str == "OMF4V" )         return OMF4VIntegrator;
-  if( str == "OMF4_5P" )       return OMF4_5PIntegrator ;
-  if( str == "OMF4_5V" )       return OMF4_5VIntegrator ;
+  if( str == "OMF2_3StepV"  )  return OMF2_3StepVIntegrator ;
+  if( str == "OMF2_3StepP"  )  return OMF2_3StepPIntegrator ;
+  if( str == "OMF2_5StepV"  )  return OMF2_5StepVIntegrator ;
+  if( str == "OMF2_5StepP"  )  return OMF2_5StepPIntegrator ;
+  if( str == "OMF4_9StepV"  )  return OMF4_9StepVIntegrator ;
+  if( str == "OMF4_9StepP"  )  return OMF4_9StepPIntegrator ;
+  if( str == "OMF4_11StepV" )  return OMF4_11StepVIntegrator ;
+  if( str == "OMF4_11StepP" )  return OMF4_11StepPIntegrator ;
   // shit the bed
   assert( false ) ;
-  return MinimumNorm2Integrator ;
+  return OMF2_5StepVIntegrator ;
 }
 
 inline std::string
@@ -66,18 +65,42 @@ IntEnumToString( const SupportedIntegrator Integrator )
 {
   std::string str = "" ;
   switch( Integrator ) {
-  case LeapFrogIntegrator :      str="Leapfrog"      ; break ;
-  case MinimumNorm2Integrator :  str="MinimumNorm2"  ; break ;
   case ForceGradientIntegrator : str="ForceGradient" ; break ;
-  case OMF2_QPQPQ :              str="OMF2_QPQPQ"    ; break ;
-  case OMF4Integrator :          str="OMF4"          ; break ;
-  case OMF4VIntegrator :         str="OMF4V"         ; break ;
-  case OMF4_5PIntegrator :       str="OMF4_5P"       ; break ;
-  case OMF4_5VIntegrator :       str="OMF4_5V"       ; break ;
+  case OMF2_3StepVIntegrator   : str="OMF2_3StepV"   ; break ;
+  case OMF2_3StepPIntegrator   : str="OMF2_3StepP"   ; break ;
+  case OMF2_5StepVIntegrator   : str="OMF2_5StepV"   ; break ;
+  case OMF2_5StepPIntegrator   : str="OMF2_5StepP"   ; break ;
+  case OMF4_9StepVIntegrator   : str="OMF4_9StepV"   ; break ;
+  case OMF4_9StepPIntegrator   : str="OMF4_9StepP"   ; break ;
+  case OMF4_11StepVIntegrator  : str="OMF4_11StepV"  ; break ;
+  case OMF4_11StepPIntegrator  : str="OMF4_11StepP"  ; break ;
   }
   return str ;
 }
 
+// I know people will be frightened by change so I list possible synonyms from the
+// literature so they recognise a familiar friend P = UpdaateP (Potential Force Term), Q = UpdateU (Kinetic)
+inline std::string
+IntEnumToString_Synonyms( const SupportedIntegrator Integrator )
+{
+  std::string str = "" ;
+  switch( Integrator ) {
+  case ForceGradientIntegrator : str="FGI_PQPQP"              ; break ;
+  case OMF2_3StepVIntegrator   : str="Leapfrog PQP"           ; break ;
+  case OMF2_3StepPIntegrator   : str="QPQ"                    ; break ;
+  case OMF2_5StepVIntegrator   : str="MinimumNorm2 PQPQP MN2" ; break ;
+  case OMF2_5StepPIntegrator   : str="QPQPQ"                  ; break ;
+  case OMF4_9StepVIntegrator   : str=""                       ; break ;
+  case OMF4_9StepPIntegrator   : str=""                       ; break ;
+  case OMF4_11StepVIntegrator  : str="OMF4 (openQCD)"         ; break ;
+  case OMF4_11StepPIntegrator  : str=""                       ; break ;
+  }
+  return str ;
+}
+
+//////////////////////////////////
+// Indexing of tuple types
+//////////////////////////////////
 template <class T, class Tuple>
 struct Index;
 
@@ -120,7 +143,8 @@ public:
   SupportedIntegrator Integrator ;
 
   explicit ActionLevel(unsigned int mul = 1,
-		       const SupportedIntegrator _Integrator = MinimumNorm2Integrator ) : 
+		       const SupportedIntegrator _Integrator = OMF2_5StepVIntegrator // this is the default MinimumNorm2 integrator
+		       ) : 
     actions(std::get<0>(actions_hirep)), multiplier(mul),Integrator(_Integrator) {
     // initialize the hirep vectors to zero.
     // apply(this->resize, actions_hirep, 0); //need a working resize
