@@ -8,12 +8,11 @@
  **/
 #include <Grid/Grid.h>
 
-#define MIXED_PRECISION
-
-#define EOFA_CHARM
-#define EOFA_STRANGE
-
 NAMESPACE_BEGIN(Grid);
+
+#define b4008
+//#define b4068
+//#define b416
 
   /*
    * Need a plan for gauge field update for mixed precision in HMC                      (2x speed up)
@@ -167,18 +166,47 @@ int main(int argc, char **argv) {
   TheHMC.Resources.AddObservable<PlaqObs>();
   //////////////////////////////////////////////
 
+#ifdef b4008
   const int Ls            = 10;
-  const Real beta         = 4.09;
-  const Real light_mass   = 0.010;
+  const Real beta         = 4.008;
+  //const Real light_mass   = 0.009;
+  const Real light_mass   = 0.012;
+  const Real strange_mass = 0.066;
+  const Real charm_mass   = 11.8*strange_mass ;
+  const Real pv_mass      = 1.0;
+  const RealD M5          = 1.0;
+  const RealD b           = 1.75; 
+  const RealD c           = 0.75;
+  std::cout<<"aml,ams,amx = " << light_mass << " , " << strange_mass << " , " << charm_mass << std::endl ;
+  //std::vector<Real> hasenbusch( { 0.02, 0.045, 0.11, 0.235, 0.45, 0.76 } ) ;
+  std::vector<Real> hasenbusch( { 0.04, 0.11, 0.21, 0.38, 0.7 } ) ;
+#elif (defined b4068)
+  const int Ls            = 8;
+  const Real beta         = 4.068;
+  const Real light_mass   = 0.0145 ; //0.010;
   const Real strange_mass = 0.056;
-  const Real charm_mass   = 0.630;
+  const Real charm_mass   = 11.8*strange_mass ;
   const Real pv_mass      = 1.0;
   const RealD M5          = 1.0;
   const RealD b           = 1.5; 
   const RealD c           = 0.5;
-
-  std::vector<Real> hasenbusch( { 0.06, 0.4 } ) ;  
-
+  std::cout<<"aml,ams,amx = " << light_mass << " , " << strange_mass << " , " << charm_mass << std::endl ;
+  //  std::vector<Real> hasenbusch( { 0.017 , 0.035, 0.07, 0.17, 0.33, 0.63 } ) ;
+  std::vector<Real> hasenbusch( { 0.035, 0.07, 0.17, 0.33, 0.63 } ) ;  
+#elif (defined b416)
+  const int Ls            = 6;
+  const Real beta         = 4.16;
+  const Real light_mass   = 0.012;
+  const Real strange_mass = 0.042;
+  const Real charm_mass   = 11.8*strange_mass ;
+  const Real pv_mass      = 1.0;
+  const RealD M5          = 1.0;
+  const RealD b           = 1.5;
+  const RealD c           = 0.5;
+  std::cout<<"aml,ams,amx = " << light_mass << " , " << strange_mass << " , " << charm_mass << std::endl ;
+  std::vector<Real> hasenbusch( { 0.05, 0.15, 0.5 } ) ;  
+#endif
+  
   auto GridPtr   = TheHMC.Resources.GetCartesian();
   auto GridRBPtr = TheHMC.Resources.GetRBCartesian();
   auto FGrid     = SpaceTimeGrid::makeFiveDimGrid(Ls,GridPtr);
@@ -240,8 +268,11 @@ int main(int argc, char **argv) {
   ConjugateGradient<FermionField> ActionCG(ActionStoppingCondition,MaxCGIterations);
 
   // could put an intermediate hasenbusch here I suppose ....
+#if (defined b4008)
+  std::vector<double> EOFAhs = { strange_mass , 0.18 , charm_mass } ;
+#elif (defined b416) || (defined b4068)
   std::vector<double> EOFAhs = { strange_mass , charm_mass } ;
-
+#endif
   std::vector<MobiusEOFAFermionD*> Strange_Op_L  , Strange_Op_R  ;
   std::vector<MobiusEOFAFermionF*> Strange_Op_LF , Strange_Op_RF ;
   
@@ -274,7 +305,17 @@ int main(int argc, char **argv) {
     EOFA[i] -> is_smeared = true ;
 
     // put them all on Level1 because the EOFA is pretty well behaved
+#ifdef b4008
+    if( i > 0 ) {
+      Level2.push_back( EOFA[i] );
+    } else {
+      Level1.push_back( EOFA[i] );
+    }
+#elif (defined b4068)
     Level2.push_back( EOFA[i] );
+#elif (defined b416)
+    Level1.push_back( EOFA[i] );
+#endif
   }
 
   ////////////////////////////////////
@@ -330,7 +371,7 @@ int main(int argc, char **argv) {
 
     double conv  = DerivativeStoppingCondition;
     if (h<3) conv= DerivativeStoppingConditionLoose; // Relax on first two hasenbusch factors
-    MPCG.push_back(new MxPCG( h==n_hasenbusch+1? 1E-11 : conv,
+    MPCG.push_back(new MxPCG( conv,
 			      MX_inner,
 			      MaxCGIterations,
 			      GridPtrF,
@@ -338,7 +379,7 @@ int main(int argc, char **argv) {
 			      *DenominatorsF[h],*Denominators[h],
 			      *LinOpF[h], *LinOpD[h]) );
     
-    ActionMPCG.push_back(new MxPCG( h==n_hasenbusch+1? 1E-14 : ActionStoppingCondition,
+    ActionMPCG.push_back(new MxPCG( ActionStoppingCondition,
 				    MX_inner,
 				    MaxCGIterations,
 				    GridPtrF,
@@ -351,7 +392,13 @@ int main(int argc, char **argv) {
     Quotients[h] -> is_smeared = true ;
 
     // put everything apart from the light quark on level 2
-    if( h > 0 ) {
+    #ifdef b4008
+    if( h > 1 ) {
+    #elif (defined b4068)
+    if( h > 2 ) {
+    #elif (defined b416)
+    if( h > 1 ) {
+    #endif
       Level2.push_back(Quotients[h]);
     } else {
       Level1.push_back(Quotients[h]);
