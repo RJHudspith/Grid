@@ -151,8 +151,9 @@ int main(int argc, char **argv) {
   CheckpointerParameters CPparams;
   CPparams.config_prefix = "ckpoint_EODWF_lat";
   CPparams.rng_prefix    = "ckpoint_EODWF_rng";
-  CPparams.saveInterval  = 1;
+  CPparams.saveInterval  = 2;
   CPparams.format        = "IEEE64BIG";
+  CPparams.saveSmeared   = false ;
   TheHMC.Resources.LoadNerscCheckpointer(CPparams);
 
   RNGModuleParameters RNGpar;

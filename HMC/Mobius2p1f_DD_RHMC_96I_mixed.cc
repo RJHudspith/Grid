@@ -322,9 +322,9 @@ int main(int argc, char **argv) {
   ////////////////////////////////////
   // Collect actions
   ////////////////////////////////////
-  ActionLevel<HMCWrapper::Field> Level1(1,MinimumNorm2Integrator);
-  ActionLevel<HMCWrapper::Field> Level2(4,MinimumNorm2Integrator);
-  ActionLevel<HMCWrapper::Field> Level3(8,MinimumNorm2Integrator);
+  ActionLevel<HMCWrapper::Field> Level1(1);
+  ActionLevel<HMCWrapper::Field> Level2(4);
+  ActionLevel<HMCWrapper::Field> Level3(8);
 
   ////////////////////////////////////
   // Strange action
