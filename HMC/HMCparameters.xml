@@ -9,9 +9,9 @@
     <StartingType>TepidStart</StartingType>
     <MD>
       <name>
-	<elem>MinimumNorm2</elem>
-	<elem>MinimumNorm2</elem>
-	<elem>OMF4</elem>
+	<elem>OMF2_5StepV</elem>
+	<elem>OMF2_5StepV</elem>
+	<elem>OMF4_11StepV</elem>
       </name>
       <MDsteps>1</MDsteps>
       <trajL>2</trajL>
