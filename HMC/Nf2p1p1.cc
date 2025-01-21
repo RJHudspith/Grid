@@ -163,7 +163,6 @@ int main(int argc, char **argv) {
   CPparams.saveInterval  = 5;
 #endif
   CPparams.format        = "IEEE64BIG";
-  //CPparams.saveSmeared   = false ;
   TheHMC.Resources.LoadNerscCheckpointer(CPparams);
 
   RNGModuleParameters RNGpar;
