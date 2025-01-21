@@ -10,9 +10,15 @@
 
 NAMESPACE_BEGIN(Grid);
 
-#define b4008
+//#define b4008
 //#define b4068
 //#define b416
+//#define b4238
+#define b4300
+
+#define L32
+//#define L24
+//#define L16
 
   /*
    * Need a plan for gauge field update for mixed precision in HMC                      (2x speed up)
@@ -151,8 +157,13 @@ int main(int argc, char **argv) {
   CheckpointerParameters CPparams;
   CPparams.config_prefix = "ckpoint_EODWF_lat";
   CPparams.rng_prefix    = "ckpoint_EODWF_rng";
-  CPparams.saveInterval  = 1;
+#if defined (b4008) || defined (b4068)
+  CPparams.saveInterval  = 4;
+#else
+  CPparams.saveInterval  = 5;
+#endif
   CPparams.format        = "IEEE64BIG";
+  //CPparams.saveSmeared   = false ;
   TheHMC.Resources.LoadNerscCheckpointer(CPparams);
 
   RNGModuleParameters RNGpar;
@@ -169,42 +180,105 @@ int main(int argc, char **argv) {
 #ifdef b4008
   const int Ls            = 10;
   const Real beta         = 4.008;
-  //const Real light_mass   = 0.009;
-  const Real light_mass   = 0.012;
-  const Real strange_mass = 0.066;
+  const Real strange_mass = 0.0725;
   const Real charm_mass   = 11.8*strange_mass ;
   const Real pv_mass      = 1.0;
   const RealD M5          = 1.0;
   const RealD b           = 1.75; 
   const RealD c           = 0.75;
+  #ifdef L32
+    const Real light_mass   = 0.004;
+    std::vector<Real> hasenbusch( { 0.0075, 0.0125, 0.0225, 0.0475, 0.09, 0.18, 0.36, 0.64 } ) ;
+  #elif (defined L24)
+    const Real light_mass   = 0.009;
+    std::vector<Real> hasenbusch( { 0.009, 0.02, 0.042, 0.09, 0.175, 0.35, 0.64 } ) ;
+  #elif (defined L16)
+    const Real light_mass   = 0.019;
+    std::vector<Real> hasenbusch( { 0.038, 0.09, 0.15, 0.3, 0.5 } ) ;
+  #else
+    #error "L not supported"
+  #endif
   std::cout<<"aml,ams,amx = " << light_mass << " , " << strange_mass << " , " << charm_mass << std::endl ;
-  //std::vector<Real> hasenbusch( { 0.02, 0.045, 0.11, 0.235, 0.45, 0.76 } ) ;
-  std::vector<Real> hasenbusch( { 0.04, 0.11, 0.21, 0.38, 0.7 } ) ;
 #elif (defined b4068)
   const int Ls            = 8;
   const Real beta         = 4.068;
-  const Real light_mass   = 0.0145 ; //0.010;
   const Real strange_mass = 0.056;
   const Real charm_mass   = 11.8*strange_mass ;
   const Real pv_mass      = 1.0;
   const RealD M5          = 1.0;
   const RealD b           = 1.5; 
   const RealD c           = 0.5;
+  #ifdef L32
+    const Real light_mass   = 0.005 ;
+    std::vector<Real> hasenbusch( { 0.017 , 0.035, 0.07, 0.17, 0.33, 0.63 } ) ;
+  #elif (defined L24)
+    const Real light_mass   = 0.010 ;
+    std::vector<Real> hasenbusch( { 0.013 , 0.03, 0.06, 0.17, 0.33, 0.63 } ) ;
+  #elif (defined L16)
+    const Real light_mass   = 0.022 ;
+    std::vector<Real> hasenbusch( { 0.04, 0.07, 0.17, 0.33, 0.61 } ) ;  
+  #else
+    #error "L not supported for these parameters"
+  #endif
   std::cout<<"aml,ams,amx = " << light_mass << " , " << strange_mass << " , " << charm_mass << std::endl ;
-  //  std::vector<Real> hasenbusch( { 0.017 , 0.035, 0.07, 0.17, 0.33, 0.63 } ) ;
-  std::vector<Real> hasenbusch( { 0.035, 0.07, 0.17, 0.33, 0.63 } ) ;  
+    ///   
 #elif (defined b416)
   const int Ls            = 6;
-  const Real beta         = 4.16;
-  const Real light_mass   = 0.012;
+  const Real beta         = 4.160;
+
   const Real strange_mass = 0.042;
   const Real charm_mass   = 11.8*strange_mass ;
   const Real pv_mass      = 1.0;
   const RealD M5          = 1.0;
   const RealD b           = 1.5;
   const RealD c           = 0.5;
+  #ifdef L32
+    const Real light_mass   = 0.006;
+    std::vector<Real> hasenbusch( { 0.02, 0.05, 0.15, 0.5 } ) ;
+  #elif (defined L24)
+    const Real light_mass   = 0.012;
+    std::vector<Real> hasenbusch( { 0.05, 0.15, 0.5 } ) ;
+  #else
+    #error "Chosen L not supported"
+  #endif
   std::cout<<"aml,ams,amx = " << light_mass << " , " << strange_mass << " , " << charm_mass << std::endl ;
-  std::vector<Real> hasenbusch( { 0.05, 0.15, 0.5 } ) ;  
+#elif (defined b4238)
+  const int Ls            = 4;
+  const Real beta         = 4.238;
+  const Real strange_mass = 0.032;
+  const Real charm_mass   = 11.8*strange_mass ;
+  const Real pv_mass      = 1.0;
+  const RealD M5          = 1.0;
+  const RealD b           = 1.25;
+  const RealD c           = 0.25;
+  #ifdef L32
+    const Real light_mass   = 0.008;
+    std::vector<Real> hasenbusch( { 0.035, 0.14, 0.4 } ) ;  
+  #elif (defined L24)
+    const Real light_mass   = 0.0145;
+    std::vector<Real> hasenbusch( { 0.055, 0.14, 0.4 } ) ;  
+  #else
+    #error "L not supported"
+  #endif 
+  std::cout<<"aml,ams,amx = " << light_mass << " , " << strange_mass << " , " << charm_mass << std::endl ;
+#elif (defined b4300)
+  const int Ls            = 4;
+  const Real beta         = 4.3;
+  const Real strange_mass = 0.023;
+  const Real charm_mass   = 11.8*strange_mass ;
+  const Real pv_mass      = 1.0;
+  const RealD M5          = 1.0;
+  const RealD b           = 1.0;
+  const RealD c           = 0.0;
+  #ifdef L32
+    const Real light_mass   = 0.0075;
+    std::vector<Real> hasenbusch( { 0.03, 0.12, 0.35 } ) ;  
+  #else
+    #error "L not supported"
+  #endif
+  std::cout<<"aml,ams,amx = " << light_mass << " , " << strange_mass << " , " << charm_mass << std::endl ;
+#else
+  exit(1) ;
 #endif
   
   auto GridPtr   = TheHMC.Resources.GetCartesian();
@@ -269,8 +343,12 @@ int main(int argc, char **argv) {
 
   // could put an intermediate hasenbusch here I suppose ....
 #if (defined b4008)
-  std::vector<double> EOFAhs = { strange_mass , 0.18 , charm_mass } ;
-#elif (defined b416) || (defined b4068)
+  #if (defined L32) || (defined L16)
+    std::vector<double> EOFAhs = { strange_mass , 0.18 , charm_mass } ;
+  #elif (defined L24)
+    std::vector<double> EOFAhs = { strange_mass , 0.2 , charm_mass } ;
+  #endif
+#elif (defined b416) || (defined b4068) || (defined b4238) || (defined b4300)
   std::vector<double> EOFAhs = { strange_mass , charm_mass } ;
 #endif
   std::vector<MobiusEOFAFermionD*> Strange_Op_L  , Strange_Op_R  ;
@@ -314,6 +392,8 @@ int main(int argc, char **argv) {
 #elif (defined b4068)
     Level2.push_back( EOFA[i] );
 #elif (defined b416)
+    Level2.push_back( EOFA[i] );
+#elif (defined b4238) || (defined b4300)
     Level1.push_back( EOFA[i] );
 #endif
   }
@@ -393,11 +473,13 @@ int main(int argc, char **argv) {
 
     // put everything apart from the light quark on level 2
     #ifdef b4008
-    if( h > 1 ) {
+    if( h > 3 ) {
     #elif (defined b4068)
     if( h > 2 ) {
     #elif (defined b416)
     if( h > 1 ) {
+    #elif (defined b4238) || (defined b4300)
+    if( h > 0 ) {
     #endif
       Level2.push_back(Quotients[h]);
     } else {
