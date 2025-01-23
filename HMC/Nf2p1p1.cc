@@ -13,11 +13,11 @@ NAMESPACE_BEGIN(Grid);
 //#define b4008
 //#define b4068
 //#define b416
-//#define b4238
-#define b4300
+#define b4238
+//#define b4300
 
-#define L32
-//#define L24
+//#define L32
+#define L24
 //#define L16
 
   /*
@@ -190,7 +190,7 @@ int main(int argc, char **argv) {
     std::vector<Real> hasenbusch( { 0.0075, 0.0125, 0.0225, 0.0475, 0.09, 0.18, 0.36, 0.64 } ) ;
   #elif (defined L24)
     const Real light_mass   = 0.009;
-    std::vector<Real> hasenbusch( { 0.009, 0.02, 0.042, 0.09, 0.175, 0.35, 0.64 } ) ;
+    std::vector<Real> hasenbusch( { 0.016, 0.028, 0.045, 0.09, 0.18, 0.4, 0.64 } ) ;
   #elif (defined L16)
     const Real light_mass   = 0.019;
     std::vector<Real> hasenbusch( { 0.038, 0.09, 0.15, 0.3, 0.5 } ) ;
@@ -209,10 +209,10 @@ int main(int argc, char **argv) {
   const RealD c           = 0.5;
   #ifdef L32
     const Real light_mass   = 0.005 ;
-    std::vector<Real> hasenbusch( { 0.017 , 0.035, 0.07, 0.17, 0.33, 0.63 } ) ;
+    std::vector<Real> hasenbusch( { 0.013, 0.03, 0.06, 0.17, 0.33, 0.63 } ) ;
   #elif (defined L24)
     const Real light_mass   = 0.010 ;
-    std::vector<Real> hasenbusch( { 0.013 , 0.03, 0.06, 0.17, 0.33, 0.63 } ) ;
+    std::vector<Real> hasenbusch( { 0.017, 0.035, 0.07, 0.17, 0.33, 0.63 } ) ;
   #elif (defined L16)
     const Real light_mass   = 0.022 ;
     std::vector<Real> hasenbusch( { 0.04, 0.07, 0.17, 0.33, 0.61 } ) ;  
@@ -224,7 +224,6 @@ int main(int argc, char **argv) {
 #elif (defined b416)
   const int Ls            = 6;
   const Real beta         = 4.160;
-
   const Real strange_mass = 0.042;
   const Real charm_mass   = 11.8*strange_mass ;
   const Real pv_mass      = 1.0;
@@ -270,7 +269,7 @@ int main(int argc, char **argv) {
   const RealD b           = 1.0;
   const RealD c           = 0.0;
   #ifdef L32
-    const Real light_mass   = 0.0075;
+    const Real light_mass   = 0.0085;
     std::vector<Real> hasenbusch( { 0.03, 0.12, 0.35 } ) ;  
   #else
     #error "L not supported"
@@ -391,7 +390,11 @@ int main(int argc, char **argv) {
 #elif (defined b4068)
     Level2.push_back( EOFA[i] );
 #elif (defined b416)
+    #ifdef L32
     Level2.push_back( EOFA[i] );
+    #else
+    Level1.push_back( EOFA[i] );
+    #endif
 #elif (defined b4238) || (defined b4300)
     Level1.push_back( EOFA[i] );
 #endif
@@ -472,11 +475,17 @@ int main(int argc, char **argv) {
 
     // put everything apart from the light quark on level 2
     #ifdef b4008
-    if( h > 3 ) {
+      #ifdef L32
+        if( h > 3 ) {
+      #elif (defined L24)
+        if( h > 2 ) {
+      #elif (defined L16)
+        if( h > 1 ) {
+      #endif
     #elif (defined b4068)
-    if( h > 2 ) {
+      if( h > 2 ) {
     #elif (defined b416)
-    if( h > 1 ) {
+      if( h > 1 ) {
     #elif (defined b4238) || (defined b4300)
     if( h > 0 ) {
     #endif
