@@ -18,6 +18,7 @@ NAMESPACE_BEGIN(Grid);
 
 //#define L32
 #define L24
+//#define L20
 //#define L16
 
   /*
@@ -197,6 +198,9 @@ int main(int argc, char **argv) {
   #elif (defined L24)
     const Real light_mass   = 0.009;
     std::vector<Real> hasenbusch( { 0.016, 0.028, 0.045, 0.09, 0.18, 0.4, 0.64 } ) ;
+  #elif (defined L20)
+    const Real light_mass   = 0.012;
+    std::vector<Real> hasenbusch( { 0.035, 0.09, 0.15, 0.3, 0.5 } ) ;    
   #elif (defined L16)
     const Real light_mass   = 0.019;
     std::vector<Real> hasenbusch( { 0.038, 0.09, 0.15, 0.3, 0.5 } ) ;
@@ -219,6 +223,9 @@ int main(int argc, char **argv) {
   #elif (defined L24)
     const Real light_mass   = 0.010 ;
     std::vector<Real> hasenbusch( { 0.017, 0.035, 0.07, 0.17, 0.33, 0.63 } ) ;
+  #elif (defined L20)
+    const Real light_mass   = 0.013 ;
+    std::vector<Real> hasenbusch( { 0.035, 0.07, 0.17, 0.33, 0.61 } ) ;
   #elif (defined L16)
     const Real light_mass   = 0.022 ;
     std::vector<Real> hasenbusch( { 0.04, 0.07, 0.17, 0.33, 0.61 } ) ;  
@@ -249,17 +256,17 @@ int main(int argc, char **argv) {
 #elif (defined b4238)
   const int Ls            = 4;
   const Real beta         = 4.238;
-  const Real strange_mass = 0.032;
+  const Real strange_mass = 0.029;
   const Real charm_mass   = 11.8*strange_mass ;
   const Real pv_mass      = 1.0;
   const RealD M5          = 1.0;
-  const RealD b           = 1.25;
-  const RealD c           = 0.25;
+  const RealD b           = 1.2;
+  const RealD c           = 0.2;
   #ifdef L32
     const Real light_mass   = 0.008;
     std::vector<Real> hasenbusch( { 0.035, 0.14, 0.4 } ) ;  
   #elif (defined L24)
-    const Real light_mass   = 0.0145;
+    const Real light_mass   = 0.012;
     std::vector<Real> hasenbusch( { 0.055, 0.14, 0.4 } ) ;  
   #else
     #error "L not supported"
@@ -272,10 +279,10 @@ int main(int argc, char **argv) {
   const Real charm_mass   = 11.8*strange_mass ;
   const Real pv_mass      = 1.0;
   const RealD M5          = 1.0;
-  const RealD b           = 1.0;
-  const RealD c           = 0.0;
+  const RealD b           = 1.175;
+  const RealD c           = 0.175;
   #ifdef L32
-    const Real light_mass   = 0.0085;
+    const Real light_mass   = 0.0095;
     std::vector<Real> hasenbusch( { 0.03, 0.12, 0.35 } ) ;  
   #else
     #error "L not supported"
@@ -347,7 +354,7 @@ int main(int argc, char **argv) {
 
   // could put an intermediate hasenbusch here I suppose ....
 #if (defined b4008)
-  #if (defined L32) || (defined L16)
+#if (defined L32) || (defined L16) || (defined L20)
     std::vector<double> EOFAhs = { strange_mass , 0.18 , charm_mass } ;
   #elif (defined L24)
     std::vector<double> EOFAhs = { strange_mass , 0.2 , charm_mass } ;
@@ -485,7 +492,7 @@ int main(int argc, char **argv) {
         if( h > 3 ) {
       #elif (defined L24)
         if( h > 2 ) {
-      #elif (defined L16)
+      #elif (defined L16) || (defined L20)
         if( h > 1 ) {
       #endif
     #elif (defined b4068)
