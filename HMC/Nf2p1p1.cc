@@ -11,9 +11,9 @@
 NAMESPACE_BEGIN(Grid);
 
 //#define b4008
-//#define b4068
+#define b4068
 //#define b416
-#define b4238
+//#define b4238
 //#define b4300
 
 //#define L32
@@ -158,16 +158,22 @@ int main(int argc, char **argv) {
   CPparams.config_prefix = "ckpoint_EODWF_lat";
   CPparams.rng_prefix    = "ckpoint_EODWF_rng";
 #if defined (b4008) || defined (b4068)
-  CPparams.saveInterval  = 4;
+  CPparams.saveInterval  = 1;
 #else
   CPparams.saveInterval  = 5;
 #endif
+  CPparams.saveSmeared   = false ;
   CPparams.format        = "IEEE64BIG";
   TheHMC.Resources.LoadNerscCheckpointer(CPparams);
 
+  // these are initial seeds and then the file IO takes precedence
   RNGModuleParameters RNGpar;
-  RNGpar.serial_seeds = "1 2 3 4 5";
-  RNGpar.parallel_seeds = "6 7 8 9 10";
+  for( int i = 0 ; i < 5 ; i++ ) {
+    RNGpar.serial_seeds += " " + std::to_string(HMCparams.Seed+i) ;
+    RNGpar.parallel_seeds += " " + std::to_string(HMCparams.Seed+5+i) ;
+  }
+  std::cout<<"Serial Seeds"<<RNGpar.serial_seeds<<std::endl ;
+  std::cout<<"Parallel Seeds"<<RNGpar.parallel_seeds<<std::endl ;
   TheHMC.Resources.SetRNGSeeds(RNGpar);
 
   // Construct observables
