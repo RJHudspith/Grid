@@ -158,7 +158,7 @@ int main(int argc, char **argv) {
   CPparams.config_prefix = "ckpoint_EODWF_lat";
   CPparams.rng_prefix    = "ckpoint_EODWF_rng";
 #if defined (b4008) || defined (b4068)
-  CPparams.saveInterval  = 1;
+  CPparams.saveInterval  = 4;
 #else
   CPparams.saveInterval  = 5;
 #endif
