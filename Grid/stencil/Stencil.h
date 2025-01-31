@@ -31,7 +31,6 @@
 #define STENCIL_MAX (16)
 
 #include <Grid/stencil/SimpleCompressor.h>   // subdir aggregate
-#include <Grid/stencil/Lebesgue.h>   // subdir aggregate
 #include <Grid/stencil/GeneralLocalStencil.h>
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -122,17 +121,22 @@ class CartesianStencilAccelerator {
   StencilVector same_node;
   Coordinate    _simd_layout;
   Parameters    parameters;
+  ViewMode mode;
   StencilEntry*  _entries_p;
+  StencilEntry*  _entries_host_p;
   cobj* u_recv_buf_p;
   cobj* u_send_buf_p;
 
   accelerator_inline cobj *CommBuf(void) const { return u_recv_buf_p; }
 
-  accelerator_inline int GetNodeLocal(int osite,int point) const {
-    return this->_entries_p[point+this->_npoints*osite]._is_local;
+  // Not a device function
+  inline int GetNodeLocal(int osite,int point) const {
+    StencilEntry SE=this->_entries_host_p[point+this->_npoints*osite];
+    return SE._is_local;
   }
   accelerator_inline StencilEntry * GetEntry(int &ptype,int point,int osite) const {
-    ptype = this->_permute_type[point]; return & this->_entries_p[point+this->_npoints*osite];
+    ptype = this->_permute_type[point];
+    return & this->_entries_p[point+this->_npoints*osite];
   }
 
   accelerator_inline uint64_t GetInfo(int &ptype,int &local,int &perm,int point,int ent,uint64_t base) const {
@@ -165,28 +169,22 @@ class CartesianStencilView : public CartesianStencilAccelerator<vobj,cobj,Parame
 {
 public:
   int *closed;
-  StencilEntry *cpu_ptr;
-  ViewMode      mode;
+  //  StencilEntry *cpu_ptr;
  public:
   // default copy constructor
   CartesianStencilView (const CartesianStencilView &refer_to_me) = default;
 
   CartesianStencilView (const CartesianStencilAccelerator<vobj,cobj,Parameters> &refer_to_me,ViewMode _mode)
-    : CartesianStencilAccelerator<vobj,cobj,Parameters>(refer_to_me),
-    cpu_ptr(this->_entries_p),
-    mode(_mode)
+    : CartesianStencilAccelerator<vobj,cobj,Parameters>(refer_to_me)
   {
-    this->_entries_p =(StencilEntry *)
-      MemoryManager::ViewOpen(this->_entries_p,
-			      this->_npoints*this->_osites*sizeof(StencilEntry),
-			      mode,
-			      AdviseDefault);
+    this->ViewOpen(_mode);
+  }
+  void ViewOpen(ViewMode _mode)
+  {
+    this->mode = _mode;
   }
 
-  void ViewClose(void)
-  {
-    MemoryManager::ViewClose(this->cpu_ptr,this->mode);
-  }
+  void ViewClose(void)  {  }
 
 };
 
@@ -256,7 +254,6 @@ protected:
   GridBase *                        _grid;
 public:
   GridBase *Grid(void) const { return _grid; }
-  LebesgueOrder *lo;
 
   ////////////////////////////////////////////////////////////////////////
   // Needed to conveniently communicate gparity parameters into GPU memory
@@ -273,11 +270,11 @@ public:
   int face_table_computed;
   int partialDirichlet;
   int fullDirichlet;
-  std::vector<commVector<std::pair<int,int> > > face_table ;
-  Vector<int> surface_list;
+  std::vector<deviceVector<std::pair<int,int> > > face_table ;
+  deviceVector<int> surface_list;
 
-  stencilVector<StencilEntry>  _entries; // Resident in managed memory
-  commVector<StencilEntry>     _entries_device; // Resident in device memory
+  std::vector<StencilEntry>   _entries; // Resident in host memory
+  deviceVector<StencilEntry>  _entries_device; // Resident in device memory
   std::vector<Packet> Packets;
   std::vector<Merge> Mergers;
   std::vector<Merge> MergersSHM;
@@ -366,11 +363,20 @@ public:
   ////////////////////////////////////////////////////////////////////////
   void CommunicateBegin(std::vector<std::vector<CommsRequest_t> > &reqs)
   {
+    FlightRecorder::StepLog("Communicate begin");
     // All GPU kernel tasks must complete
     //    accelerator_barrier();     // All kernels should ALREADY be complete
     //    _grid->StencilBarrier();   // Everyone is here, so noone running slow and still using receive buffer
                                // But the HaloGather had a barrier too.
-#ifdef ACCELERATOR_AWARE_MPI
+    for(int i=0;i<Packets.size();i++){
+      _grid->StencilSendToRecvFromPrepare(MpiReqs,
+					  Packets[i].send_buf,
+					  Packets[i].to_rank,Packets[i].do_send,
+					  Packets[i].recv_buf,
+					  Packets[i].from_rank,Packets[i].do_recv,
+					  Packets[i].xbytes,Packets[i].rbytes,i);
+    }
+    acceleratorCopySynchronise();
     for(int i=0;i<Packets.size();i++){
       _grid->StencilSendToRecvFromBegin(MpiReqs,
 					Packets[i].send_buf,
@@ -379,23 +385,6 @@ public:
 					Packets[i].from_rank,Packets[i].do_recv,
 					Packets[i].xbytes,Packets[i].rbytes,i);
     }
-#else
-#warning "Using COPY VIA HOST BUFFERS IN STENCIL"
-    for(int i=0;i<Packets.size();i++){
-      // Introduce a host buffer with a cheap slab allocator and zero cost wipe all
-      Packets[i].host_send_buf = _grid->HostBufferMalloc(Packets[i].xbytes);
-      Packets[i].host_recv_buf = _grid->HostBufferMalloc(Packets[i].rbytes);
-      if ( Packets[i].do_send ) {
-	acceleratorCopyFromDevice(Packets[i].send_buf, Packets[i].host_send_buf,Packets[i].xbytes);
-      }
-      _grid->StencilSendToRecvFromBegin(MpiReqs,
-					Packets[i].host_send_buf,
-					Packets[i].to_rank,Packets[i].do_send,
-					Packets[i].host_recv_buf,
-					Packets[i].from_rank,Packets[i].do_recv,
-					Packets[i].xbytes,Packets[i].rbytes,i);
-    }
-#endif
     // Get comms started then run checksums
     // Having this PRIOR to the dslash seems to make Sunspot work... (!)
     for(int i=0;i<Packets.size();i++){
@@ -406,27 +395,18 @@ public:
 
   void CommunicateComplete(std::vector<std::vector<CommsRequest_t> > &reqs)
   {
+    FlightRecorder::StepLog("Start communicate complete");
     _grid->StencilSendToRecvFromComplete(MpiReqs,0); // MPI is done
     if   ( this->partialDirichlet ) DslashLogPartial();
     else if ( this->fullDirichlet ) DslashLogDirichlet();
     else DslashLogFull();
-    // acceleratorCopySynchronise() is in the StencilSendToRecvFromComplete
+    //    acceleratorCopySynchronise();// is in the StencilSendToRecvFromComplete
     //    accelerator_barrier(); 
-    _grid->StencilBarrier(); 
-#ifndef ACCELERATOR_AWARE_MPI
-#warning "Using COPY VIA HOST BUFFERS IN STENCIL"
-    for(int i=0;i<Packets.size();i++){
-      if ( Packets[i].do_recv ) {
-	acceleratorCopyToDevice(Packets[i].host_recv_buf, Packets[i].recv_buf,Packets[i].rbytes);
-      }
-    }
-    _grid->HostBufferFreeAll();
-#endif
-    // run any checksums
     for(int i=0;i<Packets.size();i++){
       if ( Packets[i].do_recv )
 	FlightRecorder::recvLog(Packets[i].recv_buf,Packets[i].rbytes,Packets[i].from_rank);
     }
+    FlightRecorder::StepLog("Finish communicate complete");
   }
   ////////////////////////////////////////////////////////////////////////
   // Blocking send and receive. Either sequential or parallel.
@@ -516,6 +496,7 @@ public:
       HaloGatherDir(source,compress,point,face_idx);
     }
     accelerator_barrier(); // All my local gathers are complete
+    //    _grid->StencilBarrier();// Synch shared memory on a single nodes
     face_table_computed=1;
     assert(u_comm_offset==_unified_buffer_size);
   }
@@ -651,10 +632,10 @@ public:
   ////////////////////////////////////////
   void PrecomputeByteOffsets(void){
     for(int i=0;i<_entries.size();i++){
-      if( _entries[i]._is_local ) {
-	_entries[i]._byte_offset = _entries[i]._offset*sizeof(vobj);
+      if( this->_entries[i]._is_local ) {
+	this->_entries[i]._byte_offset = this->_entries[i]._offset*sizeof(vobj);
       } else {
-	_entries[i]._byte_offset = _entries[i]._offset*sizeof(cobj);
+	this->_entries[i]._byte_offset = this->_entries[i]._offset*sizeof(cobj);
       }
     }
   };
@@ -668,7 +649,7 @@ public:
     for(int point=0;point<this->_npoints;point++){
       this->same_node[point] = this->SameNode(point);
     }
-
+    int32_t surface_list_size=0;
     for(int site = 0 ;site< vol4;site++){
       int local = 1;
       for(int point=0;point<this->_npoints;point++){
@@ -678,11 +659,30 @@ public:
       }
       if(local == 0) {
 	for(int s=0;s<Ls;s++){
-	  surface_list.push_back(site*Ls+s);
+	  surface_list_size++;
 	}
       }
     }
-    //std::cout << "BuildSurfaceList size is "<<surface_list.size()<<std::endl;
+    std::cout << "BuildSurfaceList size is "<<surface_list.size()<<std::endl;
+    surface_list.resize(surface_list_size);
+    std::vector<int> surface_list_host(surface_list_size);
+    int32_t ss=0;
+    for(int site = 0 ;site< vol4;site++){
+      int local = 1;
+      for(int point=0;point<this->_npoints;point++){
+	if( (!this->GetNodeLocal(site*Ls,point)) && (!this->same_node[point]) ){
+	  local = 0;
+	}
+      }
+      if(local == 0) {
+	for(int s=0;s<Ls;s++){
+	  int idx=site*Ls+s;
+	  surface_list_host[ss]= idx;
+	  ss++;
+	}
+      }
+    }
+    acceleratorCopyToDevice(&surface_list_host[0],&surface_list[0],surface_list_size*sizeof(int));
   }
   /// Introduce a block structure and switch off comms on boundaries
   void DirichletBlock(const Coordinate &dirichlet_block)
@@ -770,7 +770,13 @@ public:
     this->_osites  = _grid->oSites();
 
     _entries.resize(this->_npoints* this->_osites);
-    this->_entries_p = &_entries[0];
+    _entries_device.resize(this->_npoints* this->_osites);
+    this->_entries_host_p = &_entries[0];
+    this->_entries_p = &_entries_device[0];
+
+    std::cout << GridLogMessage << " Stencil object allocated for "<<std::dec<<this->_osites
+	      <<" sites table "<<std::hex<<this->_entries_p<< " GridPtr "<<_grid<<std::dec<<std::endl;
+    
     for(int ii=0;ii<npoints;ii++){
 
       int i = ii; // reverse direction to get SIMD comms done first
@@ -847,6 +853,7 @@ public:
       u_simd_send_buf[l] = (cobj *)_grid->ShmBufferMalloc(_unified_buffer_size*sizeof(cobj));
     }
     PrecomputeByteOffsets();
+    acceleratorCopyToDevice(&this->_entries[0],&this->_entries_device[0],this->_entries.size()*sizeof(StencilEntry));
   }
 
   void Local     (int point, int dimension,int shiftpm,int cbmask)
@@ -1002,10 +1009,10 @@ public:
       for(int n=0;n<_grid->_slice_nblock[dimension];n++){
 	for(int b=0;b<_grid->_slice_block[dimension];b++){
 	  int idx=point+(lo+o+b)*this->_npoints;
-	  _entries[idx]._offset  =ro+o+b;
-	  _entries[idx]._permute=permute;
-	  _entries[idx]._is_local=1;
-	  _entries[idx]._around_the_world=wrap;
+	  this->_entries[idx]._offset  =ro+o+b;
+	  this->_entries[idx]._permute=permute;
+	  this->_entries[idx]._is_local=1;
+	  this->_entries[idx]._around_the_world=wrap;
 	}
 	o +=_grid->_slice_stride[dimension];
       }
@@ -1023,10 +1030,10 @@ public:
 
 	  if ( ocb&cbmask ) {
 	    int idx = point+(lo+o+b)*this->_npoints;
-	    _entries[idx]._offset =ro+o+b;
-	    _entries[idx]._is_local=1;
-	    _entries[idx]._permute=permute;
-	    _entries[idx]._around_the_world=wrap;
+	    this->_entries[idx]._offset =ro+o+b;
+	    this->_entries[idx]._is_local=1;
+	    this->_entries[idx]._permute=permute;
+	    this->_entries[idx]._around_the_world=wrap;
 	  }
 
 	}
@@ -1050,10 +1057,10 @@ public:
       for(int n=0;n<_grid->_slice_nblock[dimension];n++){
 	for(int b=0;b<_grid->_slice_block[dimension];b++){
 	  int idx=point+(so+o+b)*this->_npoints;
-	  _entries[idx]._offset  =offset+(bo++);
-	  _entries[idx]._is_local=0;
-	  _entries[idx]._permute=0;
-	  _entries[idx]._around_the_world=wrap;
+	  this->_entries[idx]._offset  =offset+(bo++);
+	  this->_entries[idx]._is_local=0;
+	  this->_entries[idx]._permute=0;
+	  this->_entries[idx]._around_the_world=wrap;
 	}
 	o +=_grid->_slice_stride[dimension];
       }
@@ -1070,10 +1077,10 @@ public:
 	  int ocb=1<<_grid->CheckerBoardFromOindex(o+b);// Could easily be a table lookup
 	  if ( ocb & cbmask ) {
 	    int idx = point+(so+o+b)*this->_npoints;
-	    _entries[idx]._offset  =offset+(bo++);
-	    _entries[idx]._is_local=0;
-	    _entries[idx]._permute =0;
-	    _entries[idx]._around_the_world=wrap;
+	    this->_entries[idx]._offset  =offset+(bo++);
+	    this->_entries[idx]._is_local=0;
+	    this->_entries[idx]._permute =0;
+	    this->_entries[idx]._around_the_world=wrap;
 	  }
 	}
 	o +=_grid->_slice_stride[dimension];

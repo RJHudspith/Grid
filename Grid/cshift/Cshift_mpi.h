@@ -31,7 +31,7 @@ Author: paboyle <paboyle@ph.ed.ac.uk>
 
 
 NAMESPACE_BEGIN(Grid); 
-
+const int Cshift_verbose=0;
 template<class vobj> Lattice<vobj> Cshift(const Lattice<vobj> &rhs,int dimension,int shift)
 {
   typedef typename vobj::vector_type vector_type;
@@ -55,20 +55,20 @@ template<class vobj> Lattice<vobj> Cshift(const Lattice<vobj> &rhs,int dimension
   RealD t1,t0;
   t0=usecond();
   if ( !comm_dim ) {
-    //std::cout << "CSHIFT: Cshift_local" <<std::endl;
+    //    std::cout << "CSHIFT: Cshift_local" <<std::endl;
     Cshift_local(ret,rhs,dimension,shift); // Handles checkerboarding
   } else if ( splice_dim ) {
-    //std::cout << "CSHIFT: Cshift_comms_simd call - splice_dim = " << splice_dim << " shift " << shift << " dimension = " << dimension << std::endl;
+    //    std::cout << "CSHIFT: Cshift_comms_simd call - splice_dim = " << splice_dim << " shift " << shift << " dimension = " << dimension << std::endl;
     Cshift_comms_simd(ret,rhs,dimension,shift);
   } else {
-    //std::cout << "CSHIFT: Cshift_comms" <<std::endl;
+    //    std::cout << "CSHIFT: Cshift_comms" <<std::endl;
     Cshift_comms(ret,rhs,dimension,shift);
   }
   t1=usecond();
-  //  std::cout << GridLogPerformance << "Cshift took "<< (t1-t0)/1e3 << " ms"<<std::endl;
+  if(Cshift_verbose) std::cout << GridLogPerformance << "Cshift took "<< (t1-t0)/1e3 << " ms"<<std::endl;
   return ret;
 }
-
+#if 1
 template<class vobj> void Cshift_comms(Lattice<vobj>& ret,const Lattice<vobj> &rhs,int dimension,int shift)
 {
   int sshift[2];
@@ -94,18 +94,16 @@ template<class vobj> void Cshift_comms_simd(Lattice<vobj>& ret,const Lattice<vob
   sshift[0] = rhs.Grid()->CheckerBoardShiftForCB(rhs.Checkerboard(),dimension,shift,Even);
   sshift[1] = rhs.Grid()->CheckerBoardShiftForCB(rhs.Checkerboard(),dimension,shift,Odd);
 
-  //std::cout << "Cshift_comms_simd dim "<<dimension<<"cb "<<rhs.checkerboard<<"shift "<<shift<<" sshift " << sshift[0]<<" "<<sshift[1]<<std::endl;
+  //  std::cout << "Cshift_comms_simd dim "<<dimension<<"cb "<<rhs.Checkerboard()<<"shift "<<shift<<" sshift " << sshift[0]<<" "<<sshift[1]<<std::endl;
   if ( sshift[0] == sshift[1] ) {
-    //std::cout << "Single pass Cshift_comms" <<std::endl;
+    //    std::cout << "Single pass Cshift_comms" <<std::endl;
     Cshift_comms_simd(ret,rhs,dimension,shift,0x3);
   } else {
-    //std::cout << "Two pass Cshift_comms" <<std::endl;
+    //    std::cout << "Two pass Cshift_comms" <<std::endl;
     Cshift_comms_simd(ret,rhs,dimension,shift,0x1);// if checkerboard is unfavourable take two passes
     Cshift_comms_simd(ret,rhs,dimension,shift,0x2);// both with block stride loop iteration
   }
 }
-#define ACCELERATOR_CSHIFT_NO_COPY
-#ifdef ACCELERATOR_CSHIFT_NO_COPY
 template<class vobj> void Cshift_comms(Lattice<vobj> &ret,const Lattice<vobj> &rhs,int dimension,int shift,int cbmask)
 {
   typedef typename vobj::vector_type vector_type;
@@ -125,8 +123,8 @@ template<class vobj> void Cshift_comms(Lattice<vobj> &ret,const Lattice<vobj> &r
   assert(shift<fd);
   
   int buffer_size = rhs.Grid()->_slice_nblock[dimension]*rhs.Grid()->_slice_block[dimension];
-  static cshiftVector<vobj> send_buf; send_buf.resize(buffer_size);
-  static cshiftVector<vobj> recv_buf; recv_buf.resize(buffer_size);
+  static deviceVector<vobj> send_buf; send_buf.resize(buffer_size);
+  static deviceVector<vobj> recv_buf; recv_buf.resize(buffer_size);
     
   int cb= (cbmask==0x2)? Odd : Even;
   int sshift= rhs.Grid()->CheckerBoardShiftForCB(rhs.Checkerboard(),dimension,shift,cb);
@@ -161,7 +159,7 @@ template<class vobj> void Cshift_comms(Lattice<vobj> &ret,const Lattice<vobj> &r
       grid->ShiftedRanks(dimension,comm_proc,xmit_to_rank,recv_from_rank);
       
       tcomms-=usecond();
-      //      grid->Barrier();
+      grid->Barrier();
 
       grid->SendToRecvFrom((void *)&send_buf[0],
 			   xmit_to_rank,
@@ -169,7 +167,7 @@ template<class vobj> void Cshift_comms(Lattice<vobj> &ret,const Lattice<vobj> &r
 			   recv_from_rank,
 			   bytes);
       xbytes+=bytes;
-      //      grid->Barrier();
+      grid->Barrier();
       tcomms+=usecond();
 
       tscatter-=usecond();
@@ -177,13 +175,13 @@ template<class vobj> void Cshift_comms(Lattice<vobj> &ret,const Lattice<vobj> &r
       tscatter+=usecond();
     }
   }
-  /*
-  std::cout << GridLogPerformance << " Cshift copy    "<<tcopy/1e3<<" ms"<<std::endl;
-  std::cout << GridLogPerformance << " Cshift gather  "<<tgather/1e3<<" ms"<<std::endl;
-  std::cout << GridLogPerformance << " Cshift scatter "<<tscatter/1e3<<" ms"<<std::endl;
-  std::cout << GridLogPerformance << " Cshift comm    "<<tcomms/1e3<<" ms"<<std::endl;
-  std::cout << GridLogPerformance << " Cshift BW      "<<(2.0*xbytes)/tcomms<<" MB/s "<<2*xbytes<< " Bytes "<<std::endl;
-  */
+  if (Cshift_verbose){
+    std::cout << GridLogPerformance << " Cshift copy    "<<tcopy/1e3<<" ms"<<std::endl;
+    std::cout << GridLogPerformance << " Cshift gather  "<<tgather/1e3<<" ms"<<std::endl;
+    std::cout << GridLogPerformance << " Cshift scatter "<<tscatter/1e3<<" ms"<<std::endl;
+    std::cout << GridLogPerformance << " Cshift comm    "<<tcomms/1e3<<" ms"<<std::endl;
+    std::cout << GridLogPerformance << " Cshift BW      "<<(2.0*xbytes)/tcomms<<" MB/s "<<2*xbytes<< " Bytes "<<std::endl;
+  }
 }
 
 template<class vobj> void  Cshift_comms_simd(Lattice<vobj> &ret,const Lattice<vobj> &rhs,int dimension,int shift,int cbmask)
@@ -201,9 +199,9 @@ template<class vobj> void  Cshift_comms_simd(Lattice<vobj> &ret,const Lattice<vo
   int simd_layout     = grid->_simd_layout[dimension];
   int comm_dim        = grid->_processors[dimension] >1 ;
 
-  //std::cout << "Cshift_comms_simd dim "<< dimension << " fd "<<fd<<" rd "<<rd
-  //    << " ld "<<ld<<" pd " << pd<<" simd_layout "<<simd_layout 
-  //    << " comm_dim " << comm_dim << " cbmask " << cbmask <<std::endl;
+  //  std::cout << "Cshift_comms_simd dim "<< dimension << " fd "<<fd<<" rd "<<rd
+  //	    << " ld "<<ld<<" pd " << pd<<" simd_layout "<<simd_layout 
+  //	    << " comm_dim " << comm_dim << " cbmask " << cbmask <<std::endl;
 
   assert(comm_dim==1);
   assert(simd_layout==2);
@@ -224,8 +222,8 @@ template<class vobj> void  Cshift_comms_simd(Lattice<vobj> &ret,const Lattice<vo
   int buffer_size = grid->_slice_nblock[dimension]*grid->_slice_block[dimension];
   //  int words = sizeof(vobj)/sizeof(vector_type);
 
-  static std::vector<cshiftVector<scalar_object> >  send_buf_extract; send_buf_extract.resize(Nsimd);
-  static std::vector<cshiftVector<scalar_object> >  recv_buf_extract; recv_buf_extract.resize(Nsimd);
+  static std::vector<deviceVector<scalar_object> >  send_buf_extract; send_buf_extract.resize(Nsimd);
+  static std::vector<deviceVector<scalar_object> >  recv_buf_extract; recv_buf_extract.resize(Nsimd);
   scalar_object *  recv_buf_extract_mpi;
   scalar_object *  send_buf_extract_mpi;
  
@@ -281,7 +279,7 @@ template<class vobj> void  Cshift_comms_simd(Lattice<vobj> &ret,const Lattice<vo
 	grid->ShiftedRanks(dimension,nbr_proc,xmit_to_rank,recv_from_rank); 
 
 	tcomms-=usecond();
-	//	grid->Barrier();
+	grid->Barrier();
 
 	send_buf_extract_mpi = &send_buf_extract[nbr_lane][0];
 	recv_buf_extract_mpi = &recv_buf_extract[i][0];
@@ -292,7 +290,7 @@ template<class vobj> void  Cshift_comms_simd(Lattice<vobj> &ret,const Lattice<vo
 			     bytes);
 
 	xbytes+=bytes;
-	//	grid->Barrier();
+	grid->Barrier();
 	tcomms+=usecond();
 
 	rpointers[i] = &recv_buf_extract[i][0];
@@ -305,13 +303,13 @@ template<class vobj> void  Cshift_comms_simd(Lattice<vobj> &ret,const Lattice<vo
     Scatter_plane_merge(ret,rpointers,dimension,x,cbmask);
     tscatter+=usecond();
   }
-  /*
-  std::cout << GridLogPerformance << " Cshift (s) copy    "<<tcopy/1e3<<" ms"<<std::endl;
-  std::cout << GridLogPerformance << " Cshift (s) gather  "<<tgather/1e3<<" ms"<<std::endl;
-  std::cout << GridLogPerformance << " Cshift (s) scatter "<<tscatter/1e3<<" ms"<<std::endl;
-  std::cout << GridLogPerformance << " Cshift (s) comm    "<<tcomms/1e3<<" ms"<<std::endl;
-  std::cout << GridLogPerformance << " Cshift BW      "<<(2.0*xbytes)/tcomms<<" MB/s "<<2*xbytes<< " Bytes "<<std::endl;
-  */
+  if(Cshift_verbose){
+    std::cout << GridLogPerformance << " Cshift (s) copy    "<<tcopy/1e3<<" ms"<<std::endl;
+    std::cout << GridLogPerformance << " Cshift (s) gather  "<<tgather/1e3<<" ms"<<std::endl;
+    std::cout << GridLogPerformance << " Cshift (s) scatter "<<tscatter/1e3<<" ms"<<std::endl;
+    std::cout << GridLogPerformance << " Cshift (s) comm    "<<tcomms/1e3<<" ms"<<std::endl;
+    std::cout << GridLogPerformance << " Cshift BW      "<<(2.0*xbytes)/tcomms<<" MB/s "<<2*xbytes<< " Bytes "<<std::endl;
+  }
 }
 #else 
 template<class vobj> void Cshift_comms(Lattice<vobj> &ret,const Lattice<vobj> &rhs,int dimension,int shift,int cbmask)
@@ -400,13 +398,13 @@ template<class vobj> void Cshift_comms(Lattice<vobj> &ret,const Lattice<vobj> &r
       tscatter+=usecond();
     }
   }
-  /*
-  std::cout << GridLogPerformance << " Cshift copy    "<<tcopy/1e3<<" ms"<<std::endl;
-  std::cout << GridLogPerformance << " Cshift gather  "<<tgather/1e3<<" ms"<<std::endl;
-  std::cout << GridLogPerformance << " Cshift scatter "<<tscatter/1e3<<" ms"<<std::endl;
-  std::cout << GridLogPerformance << " Cshift comm    "<<tcomms/1e3<<" ms"<<std::endl;
-  std::cout << GridLogPerformance << " Cshift BW      "<<(2.0*xbytes)/tcomms<<" MB/s "<<2*xbytes<< " Bytes "<<std::endl;
-  */
+  if(Cshift_verbose){
+    std::cout << GridLogPerformance << " Cshift copy    "<<tcopy/1e3<<" ms"<<std::endl;
+    std::cout << GridLogPerformance << " Cshift gather  "<<tgather/1e3<<" ms"<<std::endl;
+    std::cout << GridLogPerformance << " Cshift scatter "<<tscatter/1e3<<" ms"<<std::endl;
+    std::cout << GridLogPerformance << " Cshift comm    "<<tcomms/1e3<<" ms"<<std::endl;
+    std::cout << GridLogPerformance << " Cshift BW      "<<(2.0*xbytes)/tcomms<<" MB/s "<<2*xbytes<< " Bytes "<<std::endl;
+  }
 }
 
 template<class vobj> void  Cshift_comms_simd(Lattice<vobj> &ret,const Lattice<vobj> &rhs,int dimension,int shift,int cbmask)
@@ -532,15 +530,16 @@ template<class vobj> void  Cshift_comms_simd(Lattice<vobj> &ret,const Lattice<vo
     tscatter+=usecond();
 
   }
-  /*
-  std::cout << GridLogPerformance << " Cshift (s) copy    "<<tcopy/1e3<<" ms"<<std::endl;
-  std::cout << GridLogPerformance << " Cshift (s) gather  "<<tgather/1e3<<" ms"<<std::endl;
-  std::cout << GridLogPerformance << " Cshift (s) scatter "<<tscatter/1e3<<" ms"<<std::endl;
-  std::cout << GridLogPerformance << " Cshift (s) comm    "<<tcomms/1e3<<" ms"<<std::endl;
-  std::cout << GridLogPerformance << " Cshift BW      "<<(2.0*xbytes)/tcomms<<" MB/s"<<std::endl;
-  */
+  if(Cshift_verbose){
+    std::cout << GridLogPerformance << " Cshift (s) copy    "<<tcopy/1e3<<" ms"<<std::endl;
+    std::cout << GridLogPerformance << " Cshift (s) gather  "<<tgather/1e3<<" ms"<<std::endl;
+    std::cout << GridLogPerformance << " Cshift (s) scatter "<<tscatter/1e3<<" ms"<<std::endl;
+    std::cout << GridLogPerformance << " Cshift (s) comm    "<<tcomms/1e3<<" ms"<<std::endl;
+    std::cout << GridLogPerformance << " Cshift BW      "<<(2.0*xbytes)/tcomms<<" MB/s"<<std::endl;
+  }
 }
 #endif
+
 NAMESPACE_END(Grid); 
 
 #endif

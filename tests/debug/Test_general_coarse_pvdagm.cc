@@ -36,28 +36,6 @@ Author: Peter Boyle <paboyle@ph.ed.ac.uk>
 using namespace std;
 using namespace Grid;
 
-template<class Field>
-class HermOpAdaptor : public LinearOperatorBase<Field>
-{
-  LinearOperatorBase<Field> & wrapped;
-public:
-  HermOpAdaptor(LinearOperatorBase<Field> &wrapme) : wrapped(wrapme)  {};
-  void OpDiag (const Field &in, Field &out) {    assert(0);  }
-  void OpDir  (const Field &in, Field &out,int dir,int disp) {    assert(0);  }
-  void OpDirAll  (const Field &in, std::vector<Field> &out){    assert(0);  };
-  void Op     (const Field &in, Field &out){
-    wrapped.HermOp(in,out);
-  }
-  void AdjOp     (const Field &in, Field &out){
-    wrapped.HermOp(in,out);
-  }
-  void HermOpAndNorm(const Field &in, Field &out,RealD &n1,RealD &n2){    assert(0);  }
-  void HermOp(const Field &in, Field &out){
-    wrapped.HermOp(in,out);
-  }
-  
-};
-
 template<class Matrix,class Field>
 class PVdagMLinearOperator : public LinearOperatorBase<Field> {
   Matrix &_Mat;
@@ -69,78 +47,164 @@ public:
   void OpDir  (const Field &in, Field &out,int dir,int disp) {    assert(0);  }
   void OpDirAll  (const Field &in, std::vector<Field> &out){    assert(0);  };
   void Op     (const Field &in, Field &out){
+    std::cout << "Op: PVdag M "<<std::endl;
     Field tmp(in.Grid());
     _Mat.M(in,tmp);
     _PV.Mdag(tmp,out);
   }
   void AdjOp     (const Field &in, Field &out){
+    std::cout << "AdjOp: Mdag PV "<<std::endl;
     Field tmp(in.Grid());
-    _PV.M(tmp,out);
-    _Mat.Mdag(in,tmp);
+    _PV.M(in,tmp);
+    _Mat.Mdag(tmp,out);
   }
   void HermOpAndNorm(const Field &in, Field &out,RealD &n1,RealD &n2){    assert(0);  }
   void HermOp(const Field &in, Field &out){
-    std::cout << "HermOp"<<std::endl;
+    std::cout << "HermOp: Mdag PV PVdag M"<<std::endl;
+    Field tmp(in.Grid());
+    //    _Mat.M(in,tmp);
+    //    _PV.Mdag(tmp,out);
+    //    _PV.M(out,tmp);
+    //    _Mat.Mdag(tmp,out);
+    Op(in,tmp);
+    AdjOp(tmp,out);
+    //    std::cout << "HermOp done "<<norm2(out)<<std::endl;
+  }
+};
+template<class Matrix,class Field>
+class ShiftedPVdagMLinearOperator : public LinearOperatorBase<Field> {
+  Matrix &_Mat;
+  Matrix &_PV;
+  RealD shift;
+public:
+  ShiftedPVdagMLinearOperator(RealD _shift,Matrix &Mat,Matrix &PV): shift(_shift),_Mat(Mat),_PV(PV){};
+
+  void OpDiag (const Field &in, Field &out) {    assert(0);  }
+  void OpDir  (const Field &in, Field &out,int dir,int disp) {    assert(0);  }
+  void OpDirAll  (const Field &in, std::vector<Field> &out){    assert(0);  };
+  void Op     (const Field &in, Field &out){
+    std::cout << "Op: PVdag M "<<std::endl;
     Field tmp(in.Grid());
     _Mat.M(in,tmp);
     _PV.Mdag(tmp,out);
-    _PV.M(out,tmp);
-    _Mat.Mdag(tmp,out);
-    std::cout << "HermOp done "<<norm2(out)<<std::endl;
-    
+    out = out + shift * in;
   }
-};
-
-template<class Field> class DumbOperator  : public LinearOperatorBase<Field> {
-public:
-  LatticeComplex scale;
-  DumbOperator(GridBase *grid) : scale(grid)
-  {
-    scale = 0.0;
-    LatticeComplex scalesft(grid);
-    LatticeComplex scaletmp(grid);
-    for(int d=0;d<4;d++){
-      Lattice<iScalar<vInteger> > x(grid); LatticeCoordinate(x,d+1);
-      LatticeCoordinate(scaletmp,d+1);
-      scalesft = Cshift(scaletmp,d+1,1);
-      scale = 100.0*scale + where( mod(x    ,2)==(Integer)0, scalesft,scaletmp);
-    }
-    std::cout << " scale\n" << scale << std::endl;
+  void AdjOp     (const Field &in, Field &out){
+    std::cout << "AdjOp: Mdag PV "<<std::endl;
+    Field tmp(in.Grid());
+    _PV.M(tmp,out);
+    _Mat.Mdag(in,tmp);
+    out = out + shift * in;
   }
-  // Support for coarsening to a multigrid
-  void OpDiag (const Field &in, Field &out) {};
-  void OpDir  (const Field &in, Field &out,int dir,int disp){};
-  void OpDirAll  (const Field &in, std::vector<Field> &out) {};
-
-  void Op     (const Field &in, Field &out){
-    out = scale * in;
-  }
-  void AdjOp  (const Field &in, Field &out){
-    out = scale * in;
-  }
+  void HermOpAndNorm(const Field &in, Field &out,RealD &n1,RealD &n2){    assert(0);  }
   void HermOp(const Field &in, Field &out){
-    double n1, n2;
-    HermOpAndNorm(in,out,n1,n2);
-  }
-  void HermOpAndNorm(const Field &in, Field &out,double &n1,double &n2){
-    ComplexD dot;
-
-    out = scale * in;
-
-    dot= innerProduct(in,out);
-    n1=real(dot);
-
-    dot = innerProduct(out,out);
-    n2=real(dot);
+    std::cout << "HermOp: Mdag PV PVdag M"<<std::endl;
+    Field tmp(in.Grid());
+    Op(in,tmp);
+    AdjOp(tmp,out);
   }
 };
+template<class Fobj,class CComplex,int nbasis>
+class MGPreconditioner : public LinearFunction< Lattice<Fobj> > {
+public:
+  using LinearFunction<Lattice<Fobj> >::operator();
 
+  typedef Aggregation<Fobj,CComplex,nbasis> Aggregates;
+  typedef typename Aggregation<Fobj,CComplex,nbasis>::FineField    FineField;
+  typedef typename Aggregation<Fobj,CComplex,nbasis>::CoarseVector CoarseVector;
+  typedef typename Aggregation<Fobj,CComplex,nbasis>::CoarseMatrix CoarseMatrix;
+  typedef LinearOperatorBase<FineField>                            FineOperator;
+  typedef LinearFunction    <FineField>                            FineSmoother;
+  typedef LinearOperatorBase<CoarseVector>                         CoarseOperator;
+  typedef LinearFunction    <CoarseVector>                         CoarseSolver;
+  Aggregates     & _Aggregates;
+  FineOperator   & _FineOperator;
+  FineSmoother   & _PreSmoother;
+  FineSmoother   & _PostSmoother;
+  CoarseOperator & _CoarseOperator;
+  CoarseSolver   & _CoarseSolve;
+
+  int    level;  void Level(int lv) {level = lv; };
+
+  MGPreconditioner(Aggregates &Agg,
+		   FineOperator &Fine,
+		   FineSmoother &PreSmoother,
+		   FineSmoother &PostSmoother,
+		   CoarseOperator &CoarseOperator_,
+		   CoarseSolver &CoarseSolve_)
+    : _Aggregates(Agg),
+      _FineOperator(Fine),
+      _PreSmoother(PreSmoother),
+      _PostSmoother(PostSmoother),
+      _CoarseOperator(CoarseOperator_),
+      _CoarseSolve(CoarseSolve_),
+      level(1)  {  }
+
+  virtual void operator()(const FineField &in, FineField & out) 
+  {
+    GridBase *CoarseGrid = _Aggregates.CoarseGrid;
+    //    auto CoarseGrid = _CoarseOperator.Grid();
+    CoarseVector Csrc(CoarseGrid);
+    CoarseVector Csol(CoarseGrid);
+    FineField vec1(in.Grid());
+    FineField vec2(in.Grid());
+
+    std::cout<<GridLogMessage << "Calling PreSmoother " <<std::endl;
+
+    //    std::cout<<GridLogMessage << "Calling PreSmoother input residual "<<norm2(in) <<std::endl;
+    double t;
+    // Fine Smoother
+    t=-usecond();
+    _PreSmoother(in,out);
+    t+=usecond();
+
+    std::cout<<GridLogMessage << "PreSmoother took "<< t/1000.0<< "ms" <<std::endl;
+
+    // Update the residual
+    _FineOperator.Op(out,vec1);  sub(vec1, in ,vec1);   
+    //    std::cout<<GridLogMessage <<"Residual-1 now " <<norm2(vec1)<<std::endl;
+
+    // Fine to Coarse 
+    t=-usecond();
+    _Aggregates.ProjectToSubspace  (Csrc,vec1);
+    t+=usecond();
+    std::cout<<GridLogMessage << "Project to coarse took "<< t/1000.0<< "ms" <<std::endl;
+
+    // Coarse correction
+    t=-usecond();
+    _CoarseSolve(Csrc,Csol);
+    //Csol=Zero();
+    t+=usecond();
+    std::cout<<GridLogMessage << "Coarse solve took "<< t/1000.0<< "ms" <<std::endl;
+
+    // Coarse to Fine
+    t=-usecond();  
+    //    _CoarseOperator.PromoteFromSubspace(_Aggregates,Csol,vec1);
+    _Aggregates.PromoteFromSubspace(Csol,vec1); 
+    add(out,out,vec1);
+    t+=usecond();
+    std::cout<<GridLogMessage << "Promote to this level took "<< t/1000.0<< "ms" <<std::endl;
+
+    // Residual
+    _FineOperator.Op(out,vec1);  sub(vec1 ,in , vec1);  
+    //    std::cout<<GridLogMessage <<"Residual-2 now " <<norm2(vec1)<<std::endl;
+
+    // Fine Smoother
+    t=-usecond();
+    _PostSmoother(vec1,vec2);
+    t+=usecond();
+    std::cout<<GridLogMessage << "PostSmoother took "<< t/1000.0<< "ms" <<std::endl;
+
+    add( out,out,vec2);
+    std::cout<<GridLogMessage << "Done " <<std::endl;
+  }
+};
 
 int main (int argc, char ** argv)
 {
   Grid_init(&argc,&argv);
 
-  const int Ls=2;
+  const int Ls=16;
 
   GridCartesian         * UGrid   = SpaceTimeGrid::makeFourDimGrid(GridDefaultLatt(), GridDefaultSimd(Nd,vComplex::Nsimd()),GridDefaultMpi());
   GridRedBlackCartesian * UrbGrid = SpaceTimeGrid::makeFourDimRedBlackGrid(UGrid);
@@ -173,15 +237,14 @@ int main (int argc, char ** argv)
   FieldMetaData header;
   std::string file("ckpoint_lat.4000");
   NerscIO::readConfiguration(Umu,header,file);
-  //Umu = 1.0;
   
-  RealD mass=0.5;
+  RealD mass=0.01;
   RealD M5=1.8;
 
   DomainWallFermionD Ddwf(Umu,*FGrid,*FrbGrid,*UGrid,*UrbGrid,mass,M5);
   DomainWallFermionD Dpv(Umu,*FGrid,*FrbGrid,*UGrid,*UrbGrid,1.0,M5);
 
-  const int nbasis = 1;
+  const int nbasis = 8;
   const int cb = 0 ;
   LatticeFermion prom(FGrid);
 
@@ -193,24 +256,27 @@ int main (int argc, char ** argv)
   std::cout<<GridLogMessage<<std::endl;
   std::cout<<GridLogMessage<<"*******************************************"<<std::endl;
   std::cout<<GridLogMessage<<std::endl;
-  
-  PVdagMLinearOperator<DomainWallFermionD,LatticeFermionD> PVdagM(Ddwf,Dpv);
-  HermOpAdaptor<LatticeFermionD> HOA(PVdagM);
+
+  typedef PVdagMLinearOperator<DomainWallFermionD,LatticeFermionD> PVdagM_t;
+  typedef ShiftedPVdagMLinearOperator<DomainWallFermionD,LatticeFermionD> ShiftedPVdagM_t;
+  PVdagM_t PVdagM(Ddwf,Dpv);
+  ShiftedPVdagM_t ShiftedPVdagM(2.0,Ddwf,Dpv);
+
 
   // Run power method on HOA??
-  PowerMethod<LatticeFermion>       PM;   PM(HOA,src);
+  //  PowerMethod<LatticeFermion>       PM;   PM(PVdagM,src);
  
   // Warning: This routine calls PVdagM.Op, not PVdagM.HermOp
   typedef Aggregation<vSpinColourVector,vTComplex,nbasis> Subspace;
   Subspace AggregatesPD(Coarse5d,FGrid,cb);
   AggregatesPD.CreateSubspaceChebyshev(RNG5,
-				       HOA,
+				       PVdagM,
 				       nbasis,
-				       5000.0,
-				       0.02,
-				       100,
-				       50,
-				       50,
+				       4000.0,
+				       2.0,
+				       200,
+				       200,
+				       200,
 				       0.0);
   
   LittleDiracOperator LittleDiracOpPV(geom,FGrid,Coarse5d);
@@ -256,6 +322,58 @@ int main (int argc, char ** argv)
   c_proj = c_proj - c_res;
   std::cout<<GridLogMessage<<" ldop error: "<<norm2(c_proj)<<std::endl;
   //  std::cout<<GridLogMessage<<" error "<< c_proj<<std::endl;
+
+
+  /**********
+   * Some solvers
+   **********
+   */
+
+  ///////////////////////////////////////
+  // Coarse grid solver test
+  ///////////////////////////////////////
+
+  std::cout<<GridLogMessage<<"******************* "<<std::endl;
+  std::cout<<GridLogMessage<<" Coarse Grid Solve "<<std::endl;
+  std::cout<<GridLogMessage<<"******************* "<<std::endl;
+  TrivialPrecon<CoarseVector> simple;
+  NonHermitianLinearOperator<LittleDiracOperator,CoarseVector> LinOpCoarse(LittleDiracOpPV);
+  PrecGeneralisedConjugateResidualNonHermitian<CoarseVector>  L2PGCR(1.0e-8, 100, LinOpCoarse,simple,10,10); 
+  L2PGCR.Level(2);
+  c_res=Zero();
+  L2PGCR(c_src,c_res);
+
+  ////////////////////////////////////////
+  // Fine grid smoother
+  ////////////////////////////////////////
+  std::cout<<GridLogMessage<<"******************* "<<std::endl;
+  std::cout<<GridLogMessage<<" Fine Grid Smoother "<<std::endl;
+  std::cout<<GridLogMessage<<"******************* "<<std::endl;
+  TrivialPrecon<LatticeFermionD> simple_fine;
+  //  NonHermitianLinearOperator<PVdagM_t,LatticeFermionD> LinOpSmooth(PVdagM);
+  PrecGeneralisedConjugateResidualNonHermitian<LatticeFermionD> SmootherGCR(0.01,10,ShiftedPVdagM,simple_fine,4,4);
+  
+  LatticeFermionD f_src(FGrid);
+  LatticeFermionD f_res(FGrid);
+
+  f_src = one;  // 1 in every element for vector 1.
+  f_res=Zero();
+  SmootherGCR(f_src,f_res);
+
+  typedef MGPreconditioner<vSpinColourVector,  vTComplex,nbasis> TwoLevelMG;
+
+  TwoLevelMG TwoLevelPrecon(AggregatesPD,
+			    PVdagM,
+			    SmootherGCR,
+			    SmootherGCR,
+			    LinOpCoarse,
+			    L2PGCR);
+  
+  PrecGeneralisedConjugateResidualNonHermitian<LatticeFermion> L1PGCR(1.0e-8,1000,PVdagM,TwoLevelPrecon,8,8);
+  L1PGCR.Level(1);
+
+  f_res=Zero();
+  L1PGCR(f_src,f_res);
 
   std::cout<<GridLogMessage<<std::endl;
   std::cout<<GridLogMessage<<"*******************************************"<<std::endl;

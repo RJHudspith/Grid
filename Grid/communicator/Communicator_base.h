@@ -136,7 +136,7 @@ public:
     for(int d=0;d<_ndimension;d++){
       column.resize(_processors[d]);
       column[0] = accum;
-      std::vector<CommsRequest_t> list;
+      std::vector<MpiCommsRequest_t> list;
       for(int p=1;p<_processors[d];p++){
 	ShiftedRanks(d,p,source,dest);
 	SendToRecvFromBegin(list,
@@ -166,8 +166,8 @@ public:
   ////////////////////////////////////////////////////////////
   // Face exchange, buffer swap in translational invariant way
   ////////////////////////////////////////////////////////////
-  void CommsComplete(std::vector<CommsRequest_t> &list);
-  void SendToRecvFromBegin(std::vector<CommsRequest_t> &list,
+  void CommsComplete(std::vector<MpiCommsRequest_t> &list);
+  void SendToRecvFromBegin(std::vector<MpiCommsRequest_t> &list,
 			   void *xmit,
 			   int dest,
 			   void *recv,
@@ -186,6 +186,12 @@ public:
 			       int recv_from_rank,int do_recv,
 			       int bytes,int dir);
 
+  double StencilSendToRecvFromPrepare(std::vector<CommsRequest_t> &list,
+				      void *xmit,
+				      int xmit_to_rank,int do_xmit,
+				      void *recv,
+				      int recv_from_rank,int do_recv,
+				      int xbytes,int rbytes,int dir);
   double StencilSendToRecvFromBegin(std::vector<CommsRequest_t> &list,
 				    void *xmit,
 				    int xmit_to_rank,int do_xmit,

@@ -46,8 +46,22 @@ NAMESPACE_BEGIN(Grid);
 
 #if defined (GRID_COMMS_MPI3) 
 typedef MPI_Comm    Grid_MPI_Comm;
+typedef MPI_Request MpiCommsRequest_t;
+#ifdef ACCELERATOR_AWARE_MPI
 typedef MPI_Request CommsRequest_t;
+#else
+enum PacketType_t { InterNodeXmit, InterNodeRecv, IntraNodeXmit, IntraNodeRecv };
+typedef struct {
+  PacketType_t PacketType;
+  void *host_buf;
+  void *device_buf;
+  unsigned long bytes;
+  MpiCommsRequest_t req;
+} CommsRequest_t;
+#endif
+
 #else 
+typedef int MpiCommsRequest_t;
 typedef int CommsRequest_t;
 typedef int Grid_MPI_Comm;
 #endif
