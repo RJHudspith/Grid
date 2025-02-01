@@ -234,6 +234,8 @@ private:
     std::cout << GridLogHMC << "Total H after trajectory  = " << H1 << "  dH = " << H1-H0 << "\n";
     std::cout << GridLogHMC << "--------------------------------------------------\n";
 
+    const RealD runningdH = TheIntegrator.getdH() ;
+    
     std::cout.precision(current_precision);
     
     return (H1 - H0);

@@ -97,6 +97,9 @@ public:
   const ActionSet<Field, RepresentationPolicy> as;
 
   ActionSet<Field,RepresentationPolicy> LevelForces;
+
+  // stuff for trying to reduce roundoff idea is to sum over small differences
+  RealD norms[ 256 ] , delta_H ;
   
   //Get a pointer to a shared static instance of the "do-nothing" momentum filter to serve as a default
   static MomentumFilterBase<MomentaField> const* getDefaultMomFilter(){ 
@@ -242,6 +245,7 @@ public:
       Smearer(Sm),
       Representations(grid) 
   {
+    delta_H = 0. ;
     t_P.resize(levels, 0.0);
     t_U = 0.0;
     // initialization of smearer delegated outside of Integrator
@@ -471,33 +475,37 @@ public:
   // Calculate action
   RealD S(Field& U) 
   {  // here also U not used
-
     assert(as.size()==LevelForces.size());
     std::cout << GridLogIntegrator << "Integrator action\n";
 
-    RealD H = - FieldImplementation::FieldSquareNorm(P)/HMC_MOMENTUM_DENOMINATOR; // - trace (P*P)/denom
-
-    RealD Hterm;
-
+    RealD H = 0.0 ;
+    delta_H = 0.0 ;
+    
     // Actions
+    size_t idx = 1 ;    
     for (int level = 0; level < as.size(); ++level) {
       for (int actionID = 0; actionID < as[level].actions.size(); ++actionID) {
-
 	MemoryManager::Print();
         // get gauge field from the SmearingPolicy and
         // based on the boolean is_smeared in actionID
         std::cout << GridLogMessage << "S [" << level << "][" << actionID << "] action eval " << std::endl;
-	        as[level].actions.at(actionID)->S_timer_start();
-        Hterm = as[level].actions.at(actionID)->S(Smearer);
-   	        as[level].actions.at(actionID)->S_timer_stop();
-        std::cout << GridLogMessage << "S [" << level << "][" << actionID << "] H = " << Hterm << std::endl;
+	as[level].actions.at(actionID)->S_timer_start();
+        RealD Hterm = as[level].actions.at(actionID)->S(Smearer);
+	delta_H += Hterm - norms[idx] ;
+	as[level].actions.at(actionID)->S_timer_stop();
+        std::cout << GridLogMessage << "S [" << level << "][" << actionID << "] H = " << Hterm << " || dH " << delta_H << std::endl;
         H += Hterm;
+	idx++ ;
 	MemoryManager::Print();
-
       }
       as[level].apply(S_hireps, Representations, level, H);
     }
 
+    RealD Hterm = -FieldImplementation::FieldSquareNorm(P)/HMC_MOMENTUM_DENOMINATOR; // - trace (P*P)/denom
+    delta_H += ( Hterm - norms[0] ) ;
+    std::cout << GridLogMessage << "S_P H = " << Hterm << " || dH " << delta_H << std::endl;
+    H += Hterm ;
+    
     return H;
   }
 
@@ -521,27 +529,54 @@ public:
 
     std::cout << GridLogIntegrator << "Integrator initial action\n";
 
-    RealD H = - FieldImplementation::FieldSquareNorm(P)/HMC_MOMENTUM_DENOMINATOR; // - trace (P*P)/denom
-
-    RealD Hterm;
+    RealD H = -FieldImplementation::FieldSquareNorm(P)/HMC_MOMENTUM_DENOMINATOR; // - trace (P*P)/denom
+    norms[0] = H ;
 
     // Actions
+    size_t idx = 1 ;
     for (int level = 0; level < as.size(); ++level) {
       for (int actionID = 0; actionID < as[level].actions.size(); ++actionID) {
+
+	norms[idx] = 0.0 ;
+	
         // get gauge field from the SmearingPolicy and
         // based on the boolean is_smeared in actionID
         std::cout << GridLogMessage << "S [" << level << "][" << actionID << "] action eval " << std::endl;
 
 	as[level].actions.at(actionID)->S_timer_start();
-        Hterm = as[level].actions.at(actionID)->S(Smearer);
+        RealD Hterm = as[level].actions.at(actionID)->S(Smearer);
+	norms[idx] = Hterm ;
 	as[level].actions.at(actionID)->S_timer_stop();
 
-        std::cout << GridLogMessage << "S [" << level << "][" << actionID << "] H = " << Hterm << std::endl;
         H += Hterm;
+	idx++ ;
       }
       as[level].apply(Sinitial_hireps, Representations, level, H);
     }
+
+    RealD sum = norms[0] ;
+    std::cout<< GridLogIntegrator << "Norms " << norms[0] << std::endl ;
+    idx = 1 ;
+    for (int level = 0; level < as.size(); ++level) {
+      for (int actionID = 0; actionID < as[level].actions.size(); ++actionID) {
+	std::cout<< GridLogIntegrator << "Norms " << norms[idx] << std::endl ;
+	sum += norms[idx] ;
+	idx++ ;
+      }
+    }
+    std::cout<< GridLogIntegrator << "TotH " << sum << " " << H << std::endl ;
+    
     return H;
+  }
+
+  // returns the running delta_H
+  RealD getdH( void )
+  {
+    std::streamsize current_precision = std::cout.precision();
+    std::cout.precision(15);
+    std::cout << GridLogMessage << "Running dH :: "<< delta_H << std::endl ;
+    std::cout.precision(current_precision);
+    return delta_H ;
   }
 
   void integrate(Field& U) 
