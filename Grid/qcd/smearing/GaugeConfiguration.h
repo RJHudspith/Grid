@@ -96,7 +96,7 @@ protected:
     GridBase* grid = GaugeK.Grid();
     GaugeField C(grid), SigmaK(grid), iLambda(grid);
     GaugeLinkField iLambda_mu(grid);
-    GaugeLinkField iQ(grid), e_iQ(grid);
+    GaugeLinkField e_iQ(grid);
     GaugeLinkField SigmaKPrime_mu(grid);
     GaugeLinkField GaugeKmu(grid), Cmu(grid);
 
@@ -108,9 +108,9 @@ protected:
     {
       Cmu = peekLorentz(C, mu);
       GaugeKmu = peekLorentz(GaugeK, mu);
-      SigmaKPrime_mu = peekLorentz(SigmaKPrime, mu);
-      iQ = Ta(Cmu * adj(GaugeKmu));
-      set_iLambda(iLambda_mu, e_iQ, iQ, SigmaKPrime_mu, GaugeKmu);
+      SigmaKPrime_mu = peekLorentz(SigmaKPrime, mu);      
+      set_iLambda(iLambda_mu, e_iQ, Ta(Cmu * adj(GaugeKmu)),
+		  SigmaKPrime_mu, GaugeKmu);
       pokeLorentz(SigmaK, SigmaKPrime_mu * e_iQ + adj(Cmu) * iLambda_mu, mu);
       pokeLorentz(iLambda, iLambda_mu, mu);
     }
@@ -126,96 +126,103 @@ protected:
   }
 
   //====================================================================
-  void set_iLambda(GaugeLinkField& iLambda, GaugeLinkField& e_iQ,
-                   const GaugeLinkField& iQ, const GaugeLinkField& Sigmap,
+  void set_iLambda(GaugeLinkField& iLambda,
+		   GaugeLinkField& e_iQ,
+                   const GaugeLinkField& iQ,
+		   const GaugeLinkField& Sigmap,
                    const GaugeLinkField& GaugeK) const 
   {
     GridBase* grid = iQ.Grid();
-    GaugeLinkField iQ2(grid), iQ3(grid), B1(grid), B2(grid), USigmap(grid);
-    GaugeLinkField unity(grid);
-    unity = 1.0;
-
-    LatticeComplex u(grid), w(grid);
-    LatticeComplex f0(grid), f1(grid), f2(grid);
-    LatticeComplex xi0(grid), xi1(grid), tmp(grid);
-    LatticeComplex u2(grid), w2(grid), cosw(grid);
-    LatticeComplex emiu(grid), e2iu(grid), qt(grid), fden(grid);
-    LatticeComplex r01(grid), r11(grid), r21(grid), r02(grid), r12(grid);
-    LatticeComplex r22(grid), tr1(grid), tr2(grid);
-    LatticeComplex b10(grid), b11(grid), b12(grid), b20(grid), b21(grid),
-      b22(grid);
+    GaugeLinkField B1(grid), B2(grid) ;
     LatticeComplex LatticeUnitComplex(grid);
-
     LatticeUnitComplex = 1.0;
 
-    // Exponential
-    iQ2 = iQ * iQ;
-    iQ3 = iQ * iQ2;
-    StoutSmearing->set_uw(u, w, iQ2, iQ3);
-    StoutSmearing->set_fj(f0, f1, f2, u, w);
-    e_iQ = f0 * unity + timesMinusI(f1) * iQ - f2 * iQ2;
+    GaugeLinkField iQ2 = iQ*iQ;
 
-    // Getting B1, B2, Gamma and Lambda
-    // simplify this part, reduntant calculations in set_fj
-    xi0 = StoutSmearing->func_xi0(w);
-    xi1 = StoutSmearing->func_xi1(w);
-    u2 = u * u;
-    w2 = w * w;
-    cosw = cos(w);
+    // sign in c0 from the conventions on the Ta
+    LatticeComplex u = -imag(trace(iQ2*iQ))*0.3333333333333333148 ;
+    LatticeComplex w = -real(trace(iQ2))*0.5;
+    LatticeComplex f0 = 0.3849001794597505244*w ;
+    w = sqrt(w) ;
+    f0 = f0*w ;
+    f0 = acos(u/f0)*0.3333333333333333148;
+    u = w*(0.5773502691896257311)*cos(f0);
+    w = w*sin(f0);
 
-    emiu = cos(u) - timesI(sin(u));
-    e2iu = cos(2.0 * u) + timesI(sin(2.0 * u));
+    const LatticeComplex xi0 = StoutSmearing -> func_xi0(w);
+    LatticeComplex f2 = timesI( xi0 );
+    const LatticeComplex u2 = u * u;
+    const LatticeComplex w2 = w * w;
+    const LatticeComplex xi1 = StoutSmearing -> func_xi1(w);
+    // set w to cos(w) as the actual value of w is not used after here
+    w = cos(w);
+    
+    LatticeComplex emiu = cos(u) - timesI(sin(u));
+    //LatticeComplex e2iu = adj(emiu)*adj(emiu) ; weirdly sensitive to this ....
+    u *= 2. ;
+    LatticeComplex e2iu = cos(u) + timesI(sin(u));
+    
+    f0 = e2iu * (u2 - w2) + emiu * ((8.0*u2 * w) + (u * (3.0*u2 + w2) * f2));
+    LatticeComplex f1 = e2iu*u - emiu * ((u * w) - (3.0*u2 - w2) * f2);
+    f2 = e2iu - emiu * (w + (1.5*u) * f2);
+    
+    const LatticeComplex r01 = (u + timesI(2.0*(u2 - w2))) * e2iu +
+      emiu * ((8.*u*w + u * (3.0 * u2 + w2) * xi0) +
+	      timesI(-8.0 * u2 * w + 2.0 * (9.0 * u2 + w2) * xi0));
+    
+    const LatticeComplex r11 = (2.0 * LatticeUnitComplex + timesI(2.0*u)) * e2iu +
+      emiu * ((-2.0 * w + (3.0 * u2 - w2) * xi0) +
+	      timesI(u*(w + 3.0*xi0)));
+    
+    const LatticeComplex r21 = 2.0*timesI(e2iu) + emiu * (-1.5*u * xi0 + timesI(w - 3.0 * xi0));
+    
+    const LatticeComplex r02 = -2.0 * e2iu +
+      emiu * (-8.0*u2*xi0 + timesI(u * (w + xi0 + 3.0*u2*xi1)));
 
-    r01 = (2.0 * u + timesI(2.0 * (u2 - w2))) * e2iu +
-      emiu * ((16.0 * u * cosw + 2.0 * u * (3.0 * u2 + w2) * xi0) +
-	      timesI(-8.0 * u2 * cosw + 2.0 * (9.0 * u2 + w2) * xi0));
+    const LatticeComplex r12 = emiu * (u * xi0 + timesI(-w - xi0 + 3.0*u2*xi1));
 
-    r11 = (2.0 * LatticeUnitComplex + timesI(4.0 * u)) * e2iu +
-      emiu * ((-2.0 * cosw + (3.0 * u2 - w2) * xi0) +
-	      timesI((2.0 * u * cosw + 6.0 * u * xi0)));
+    const LatticeComplex r22 = emiu * (xi0 - timesI(1.5*u * xi1));
+    
+    w = 1.0 ; 
+    w = w / (9.0 * u2 - w2);  // reals
+    f0 = f0 * w ;
+    f1 = f1 * w ;
+    f2 = f2 * w ;
 
-    r21 =
-      2.0 * timesI(e2iu) + emiu * (-3.0 * u * xi0 + timesI(cosw - 3.0 * xi0));
+    w *= (0.5*w) ;
+    
+    // exponentiate B1
+    emiu = 3.*u2 - w2 ;
+    e2iu = 30.*u2 + 2.*w2 ;
+    LatticeComplex b0 = u*r01 + emiu*r02 - e2iu*f0;
+    LatticeComplex b1 = u*r11 + emiu*r12 - e2iu*f1;
+    LatticeComplex b2 = u*r21 + emiu*r22 - e2iu*f2;
+    b0 *= w;
+    b1 *= w;
+    b2 *= w;
+    B1 = 1.0 ;
+    B1 = b0*B1 + timesMinusI(b1)*iQ - b2*iQ2;
 
-    r02 = -2.0 * e2iu +
-      emiu * (-8.0 * u2 * xi0 +
-	      timesI(2.0 * u * (cosw + xi0 + 3.0 * u2 * xi1)));
+    // exponentiate B2
+    emiu = 1.5*u ;
+    e2iu = 12.*u ;
+    b0 = r01 - emiu*r02 - e2iu*f0;
+    b1 = r11 - emiu*r12 - e2iu*f1;
+    b2 = r21 - emiu*r22 - e2iu*f2;
+    b0 *= w;
+    b1 *= w;
+    b2 *= w;
+    B2 = 1.0 ;
+    B2 = b0*B2 + timesMinusI(b1)*iQ - b2*iQ2;
 
-    r12 = emiu * (2.0 * u * xi0 + timesI(-cosw - xi0 + 3.0 * u2 * xi1));
+    // compute sigmap, which we reuse the space for e_iQ
+    e_iQ = GaugeK * Sigmap;
+    iLambda = Ta( trace(e_iQ * B1) * iQ - timesI( trace(e_iQ * B2) )*iQ2 +
+		  timesI(f1) * e_iQ + f2 * (iQ * e_iQ + e_iQ * iQ) );
 
-    r22 = emiu * (xi0 - timesI(3.0 * u * xi1));
-
-    fden = LatticeUnitComplex / (2.0 * (9.0 * u2 - w2) * (9.0 * u2 - w2));
-
-    b10 = 2.0 * u * r01 + (3.0 * u2 - w2) * r02 - (30.0 * u2 + 2.0 * w2) * f0;
-    b11 = 2.0 * u * r11 + (3.0 * u2 - w2) * r12 - (30.0 * u2 + 2.0 * w2) * f1;
-    b12 = 2.0 * u * r21 + (3.0 * u2 - w2) * r22 - (30.0 * u2 + 2.0 * w2) * f2;
-
-    b20 = r01 - (3.0 * u) * r02 - (24.0 * u) * f0;
-    b21 = r11 - (3.0 * u) * r12 - (24.0 * u) * f1;
-    b22 = r21 - (3.0 * u) * r22 - (24.0 * u) * f2;
-
-    b10 *= fden;
-    b11 *= fden;
-    b12 *= fden;
-    b20 *= fden;
-    b21 *= fden;
-    b22 *= fden;
-
-    B1 = b10 * unity + timesMinusI(b11) * iQ - b12 * iQ2;
-    B2 = b20 * unity + timesMinusI(b21) * iQ - b22 * iQ2;
-    USigmap = GaugeK * Sigmap;
-
-    tr1 = trace(USigmap * B1);
-    tr2 = trace(USigmap * B2);
-
-    GaugeLinkField QUS = iQ * USigmap;
-    GaugeLinkField USQ = USigmap * iQ;
-
-    GaugeLinkField iGamma = tr1 * iQ - timesI(tr2) * iQ2 +
-      timesI(f1) * USigmap + f2 * QUS + f2 * USQ;
-
-    iLambda = Ta(iGamma);
+    // finally return the exponential
+    e_iQ = 1.0 ;
+    e_iQ = f0*e_iQ + timesMinusI(f1)*iQ - f2*iQ2;
   }
 
   //====================================================================
