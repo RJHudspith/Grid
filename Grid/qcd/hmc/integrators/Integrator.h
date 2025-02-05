@@ -149,11 +149,11 @@ public:
 
       double start_force = usecond();
 
-      MemoryManager::Print();
+      //MemoryManager::Print();
       as[level].actions.at(a)->deriv_timer_start();
       as[level].actions.at(a)->deriv(Smearer, force);  // deriv should NOT include Ta
       as[level].actions.at(a)->deriv_timer_stop();
-      MemoryManager::Print();
+      //MemoryManager::Print();
 
       auto name = as[level].actions.at(a)->action_name();
 
@@ -186,7 +186,6 @@ public:
       double time_full  = (end_full - start_full) / 1e3;
       double time_force = (end_force - start_force) / 1e3;
       std::cout << GridLogMessage << "["<<level<<"]["<<a<<"] P update elapsed time: " << time_full << " ms (force: " << time_force << " ms)"  << std::endl;
-
     }
 
     {

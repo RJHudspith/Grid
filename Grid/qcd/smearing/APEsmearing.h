@@ -62,18 +62,22 @@ public:
 
   ///////////////////////////////////////////////////////////////////////////////
   void smear(GaugeField& u_smr, const GaugeField& U)const{
+    // faster version but doesn't work with weird boundaries!!! Use at your own risk!!
     GridBase *grid = U.Grid();
-    GaugeLinkField Cup(grid), tmp_stpl(grid);
-    WilsonLoops<Gimpl> WL;
-    u_smr = Zero();
-
+    GaugeLinkField Cup(grid), tmp_staple(grid) , tmp( grid ) ;
+    std::vector<GaugeLinkField> u(Nd, grid);
+    for (int d = 0; d < Nd; d++) {
+      u[d] = PeekIndex<LorentzIndex>(U, d);
+    }
     for(int mu=0; mu<Nd; ++mu){
       Cup = Zero();
       for(int nu=0; nu<Nd; ++nu){
 	if (nu != mu) {
+	  tmp = Cshift(u[nu],mu,1) ;
+	  tmp_staple  = u[nu]*Cshift(u[mu],nu,1)*adj(tmp) ;
+	  tmp_staple += Cshift(adj(u[nu])*u[mu]*tmp,nu,-1) ;
 	  // get the staple in direction mu, nu
-	  WL.Staple(tmp_stpl, U, mu, nu);  //nb staple conventions of IroIro and Grid differ by a dagger
-	  Cup += tmp_stpl*rho[mu + Nd * nu];
+	  Cup += adj(tmp_staple)*rho[mu + Nd * nu];
 	}
       }
       // save the Cup link-field on the u_smr gauge-field

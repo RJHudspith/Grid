@@ -117,7 +117,7 @@ public:
 #if (Config_Nc == 2)
     const LatticeComplex z0 = peekColour( iQ , 0 , 0 ) ;
     const LatticeComplex z1 = peekColour( iQ , 0 , 1 ) ; 
-    const LatticeComplex Z = sqrt( z0*z0 + z1*adj(z1) ) ;
+    const LatticeComplex Z  = sqrt( z0*z0 + z1*adj(z1) ) ;
     const LatticeComplex f0 = cos( Z ) ;
     const LatticeComplex f1 = sin( Z )/Z ;
     e_iQ = 1.0 ;

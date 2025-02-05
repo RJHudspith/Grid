@@ -116,7 +116,7 @@ public:
   }
   virtual void deriv(ConfigurationBase<GaugeField>& U, GaugeField& dSdU)
   {
-    deriv(U.get_U(is_smeared),dSdU); 
+    deriv(U.get_U(is_smeared),dSdU);
     if ( is_smeared ) {
       U.smeared_force(dSdU);
     }

@@ -99,23 +99,17 @@ protected:
     GaugeLinkField e_iQ(grid);
     GaugeLinkField SigmaKPrime_mu(grid);
     GaugeLinkField GaugeKmu(grid), Cmu(grid);
-
     StoutSmearing->BaseSmear(C, GaugeK);
-    SigmaK = Zero();
-    iLambda = Zero();
-
-    for (int mu = 0; mu < Nd; mu++)
-    {
+    for (int mu = 0; mu < Nd; mu++) {
       Cmu = peekLorentz(C, mu);
       GaugeKmu = peekLorentz(GaugeK, mu);
-      SigmaKPrime_mu = peekLorentz(SigmaKPrime, mu);      
+      SigmaKPrime_mu = peekLorentz(SigmaKPrime, mu);
       set_iLambda(iLambda_mu, e_iQ, Ta(Cmu * adj(GaugeKmu)),
 		  SigmaKPrime_mu, GaugeKmu);
       pokeLorentz(SigmaK, SigmaKPrime_mu * e_iQ + adj(Cmu) * iLambda_mu, mu);
       pokeLorentz(iLambda, iLambda_mu, mu);
     }
-    StoutSmearing->derivative(SigmaK, iLambda,
-                             GaugeK);  // derivative of SmearBase
+    StoutSmearing->derivative(SigmaK, iLambda, GaugeK);  // derivative of SmearBase
     return SigmaK;
   }
 
@@ -269,7 +263,6 @@ public:
 
       for (int ismr = smearingLevels - 1; ismr > 0; --ismr)
         force = AnalyticSmearedForce(force, get_smeared_conf(ismr - 1));
-
       force = AnalyticSmearedForce(force, *ThinLinks);
 
       for (int mu = 0; mu < Nd; mu++)
