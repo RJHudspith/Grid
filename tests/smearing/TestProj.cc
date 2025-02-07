@@ -383,6 +383,251 @@ exponentiate_iQ_old( LatticeColourMatrix& e_iQ,
   e_iQ = f0 * unity + timesMinusI(f1) * iQ - f2 * iQ2;
 }
 
+static void
+smear( LatticeGaugeField &u_smr , const LatticeGaugeField &U )
+{
+  GridBase *grid = U.Grid();
+  LatticeColourMatrix Cup(grid), tmp_staple(grid) , tmp( grid ) ; 
+  std::vector<LatticeColourMatrix> u(Nd, grid);
+  for (int d = 0; d < Nd; d++) {
+    u[d] = PeekIndex<LorentzIndex>(U, d);
+  }
+  for(int mu=0; mu<Nd; ++mu){
+    Cup = Zero();
+    for(int nu=0; nu<Nd; ++nu){
+      if (nu != mu) {
+	tmp = Cshift(u[nu],mu,1) ;
+	tmp_staple  = u[nu]*Cshift(u[mu],nu,1)*adj(tmp) ;
+	
+	tmp_staple += Cshift(adj(u[nu])*u[mu]*tmp,nu,-1) ;
+	Cup += adj(tmp_staple)*0.1;
+      }
+    }
+    pokeLorentz(u_smr, adj(Cup), mu); 
+  }
+}
+
+static void
+smear_nuunroll( LatticeGaugeField &u_smr , const LatticeGaugeField &U )
+{
+  GridBase *grid = U.Grid();
+  LatticeColourMatrix Cup(grid), tmp_staple(grid) , tmp_staple2( grid ) , tmp( grid ) , tmp2( grid ) ; 
+  std::vector<LatticeColourMatrix> u(Nd, grid);
+  for (int d = 0; d < Nd; d++) {
+    u[d] = PeekIndex<LorentzIndex>(U, d);
+  }
+
+  int mp[4][3] = { {1,2,3} , {0,2,3} , {0,1,3} , {0,1,2} } ;
+  
+  for(int mu=0; mu<Nd; ++mu){
+    /*
+    int nu = mp[mu][0] ;
+    tmp = Cshift(u[nu],mu,1) ;
+    tmp_staple  = u[nu]*Cshift(u[mu],nu,1)*adj(tmp) ;
+    tmp_staple += Cshift(adj(u[nu])*u[mu]*tmp,nu,-1) ;
+    Cup  = (tmp_staple)*0.1;
+
+    nu = mp[mu][1] ;
+    tmp = Cshift(u[nu],mu,1) ;
+    tmp_staple  = u[nu]*Cshift(u[mu],nu,1)*adj(tmp) ;
+    tmp_staple += Cshift(adj(u[nu])*u[mu]*tmp,nu,-1) ;
+    Cup += (tmp_staple)*0.1;
+
+    nu = mp[mu][2] ;
+    tmp = Cshift(u[nu],mu,1) ;
+    tmp_staple  = u[nu]*Cshift(u[mu],nu,1)*adj(tmp) ;
+    tmp_staple += Cshift(adj(u[nu])*u[mu]*tmp,nu,-1) ;
+    Cup += (tmp_staple)*0.1;
+    */
+
+    int nu = mp[mu][0] ;
+    tmp = Cshift(u[nu],mu,1) ; tmp2 = Cshift(u[mu],nu,1) ;
+    {
+      autoView( tmp_staple_v  , tmp_staple  , AcceleratorWrite ) ;
+      autoView( tmp_staple2_v , tmp_staple2 , AcceleratorWrite ) ;
+      autoView( tmp_v         , tmp         , AcceleratorRead ) ;
+      autoView( tmp2_v        , tmp2        , AcceleratorRead ) ;
+      autoView( unu_v         , u[nu]       , AcceleratorRead ) ;
+      autoView( umu_v         , u[mu]       , AcceleratorRead ) ;
+      accelerator_for(ss,unu_v.size(), Field::vector_object::Nsimd(),{
+	  coalescedWrite( tmp_staple_v[ss]  , unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ) ;
+	  coalescedWrite( tmp_staple2_v[ss] , adj(unu_v[ss])*umu_v[ss]*(tmp_v[ss]) ) ;
+	}) ;
+    }
+    tmp_staple += Cshift(tmp_staple2,nu,-1) ;      
+    Cup  = tmp_staple*0.1;
+
+    // second nu dir
+    nu = mp[mu][1] ;
+    tmp = Cshift(u[nu],mu,1) ; tmp2 = Cshift(u[mu],nu,1) ;
+    {
+      autoView( tmp_staple_v  , tmp_staple  , AcceleratorWrite ) ;
+      autoView( tmp_staple2_v , tmp_staple2 , AcceleratorWrite ) ;
+      autoView( tmp_v         , tmp         , AcceleratorRead ) ;
+      autoView( tmp2_v        , tmp2        , AcceleratorRead ) ;
+      autoView( unu_v         , u[nu]       , AcceleratorRead ) ;
+      autoView( umu_v         , u[mu]       , AcceleratorRead ) ;
+      accelerator_for(ss,unu_v.size(), Field::vector_object::Nsimd(),{
+	  coalescedWrite( tmp_staple_v[ss]  , unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ) ;
+	  coalescedWrite( tmp_staple2_v[ss] , adj(unu_v[ss])*umu_v[ss]*(tmp_v[ss]) ) ;
+	}) ;
+    }
+    tmp_staple += Cshift(tmp_staple2,nu,-1) ;      
+    Cup += tmp_staple*0.1;
+
+    // final orthogonal direction
+    nu = mp[mu][2] ;
+    tmp = Cshift(u[nu],mu,1) ; tmp2 = Cshift(u[mu],nu,1) ;
+    {
+      autoView( tmp_staple_v  , tmp_staple  , AcceleratorWrite ) ;
+      autoView( tmp_staple2_v , tmp_staple2 , AcceleratorWrite ) ;
+      autoView( tmp_v         , tmp         , AcceleratorRead ) ;
+      autoView( tmp2_v        , tmp2        , AcceleratorRead ) ;
+      autoView( unu_v         , u[nu]       , AcceleratorRead ) ;
+      autoView( umu_v         , u[mu]       , AcceleratorRead ) ;
+      accelerator_for(ss,unu_v.size(), Field::vector_object::Nsimd(),{
+	  coalescedWrite( tmp_staple_v[ss]  , unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ) ;
+	  coalescedWrite( tmp_staple2_v[ss] , adj(unu_v[ss])*umu_v[ss]*(tmp_v[ss]) ) ;
+	}) ;
+    }
+    tmp_staple += Cshift(tmp_staple2,nu,-1) ;      
+    Cup  += tmp_staple*0.1;
+    
+    pokeLorentz(u_smr, (Cup), mu); 
+  }
+}
+
+template <class Gimpl>
+static void derivative( LatticeGaugeField& SigmaTerm,
+			const LatticeGaugeField& iLambda,
+			const LatticeGaugeField& U)
+{
+  GridBase *grid = U.Grid();
+
+  WilsonLoops<Gimpl> WL;
+  LatticeColourMatrix staple(grid), u_tmp(grid);
+  LatticeColourMatrix iLambda_mu(grid), iLambda_nu(grid);
+  LatticeColourMatrix U_mu(grid), U_nu(grid);
+  LatticeColourMatrix sh_field(grid), temp_Sigma(grid);
+  Real rho_munu = 0.1 , rho_numu = 0.1 ;
+
+  Real rho[16] = { 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 } ;
+
+      for(int mu = 0; mu < Nd; ++mu){
+      U_mu       = peekLorentz(      U, mu);
+      iLambda_mu = peekLorentz(iLambda, mu);
+
+      for(int nu = 0; nu < Nd; ++nu){
+	if(nu==mu) continue;
+	U_nu       = peekLorentz(      U, nu);
+	iLambda_nu = peekLorentz(iLambda, nu);
+
+	rho_munu = rho[mu + Nd * nu];
+	rho_numu = rho[nu + Nd * mu];
+
+	WL.StapleUpper(staple, U, mu, nu);
+
+	temp_Sigma = -rho_numu*staple*iLambda_nu;  //ok
+	//-r_numu*U_nu(x+mu)*Udag_mu(x+nu)*Udag_nu(x)*Lambda_nu(x)
+	Gimpl::AddLink(SigmaTerm, temp_Sigma, mu);
+
+	sh_field = Cshift(iLambda_nu, mu, 1);// general also for Gparity?
+
+	temp_Sigma = rho_numu*sh_field*staple; //ok
+	//r_numu*Lambda_nu(mu)*U_nu(x+mu)*Udag_mu(x+nu)*Udag_nu(x)
+	Gimpl::AddLink(SigmaTerm, temp_Sigma, mu);
+
+	sh_field = Cshift(iLambda_mu, nu, 1);
+
+	temp_Sigma = -rho_munu*staple*U_nu*sh_field*adj(U_nu); //ok
+	//-r_munu*U_nu(x+mu)*Udag_mu(x+nu)*Lambda_mu(x+nu)*Udag_nu(x)
+	Gimpl::AddLink(SigmaTerm, temp_Sigma, mu);
+	
+	staple = Zero();
+	sh_field = Cshift(U_nu, mu, 1);
+
+	temp_Sigma = -rho_munu*adj(sh_field)*adj(U_mu)*iLambda_mu*U_nu;
+	temp_Sigma += rho_numu*adj(sh_field)*adj(U_mu)*iLambda_nu*U_nu;
+
+	u_tmp = adj(U_nu)*iLambda_nu;
+	sh_field = Cshift(u_tmp, mu, 1);
+	temp_Sigma += -rho_numu*sh_field*adj(U_mu)*U_nu;
+	sh_field = Cshift(temp_Sigma, nu, -1);
+	Gimpl::AddLink(SigmaTerm, sh_field, mu);
+      }
+    }
+}
+
+//// New code 
+template <class Gimpl>
+static void derivative_new( LatticeGaugeField& SigmaTerm,
+			    const LatticeGaugeField& iLambda,
+			    const LatticeGaugeField& U)
+{
+  GridBase *grid = U.Grid();
+  LatticeColourMatrix staple(grid), u_tmp(grid) ;
+  LatticeColourMatrix sh_field(grid), temp_Sigma(grid) ;
+  Real rho_munu = 0.1 , rho_numu = 0.1 ;
+  Real rho[16] = { 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 } ;
+
+  std::vector<LatticeColourMatrix> u(Nd, grid), il(Nd, grid) ;
+  for (int d = 0; d < Nd; d++) {
+    u[d] = PeekIndex<LorentzIndex>(U, d);
+    il[d] = PeekIndex<LorentzIndex>(iLambda, d);
+  }
+
+  for(int mu = 0; mu < Nd; ++mu){
+    for(int nu = 0; nu < Nd; ++nu){
+      if(nu==mu) continue;
+
+      rho_munu = rho[mu + Nd * nu];
+      rho_numu = rho[nu + Nd * mu]; 
+
+      u_tmp = Cshift(u[nu],mu,1) ;
+      staple = adj(u[nu]*Cshift(u[mu],nu,1)*adj(u_tmp)) ;
+      sh_field = Cshift(il[nu], mu, 1);
+      {
+	autoView( tmp_v  , temp_Sigma , AcceleratorWrite ) ;
+	autoView( sh_v   , sh_field , AcceleratorRead ) ;
+	autoView( sh2_v  , Cshift(il[mu], nu, 1) , AcceleratorRead ) ;
+	autoView( st_v   , staple   , AcceleratorRead ) ;
+	autoView( unu_v  , u[nu]    , AcceleratorRead ) ;
+	autoView( ilnu_v , il[nu]   , AcceleratorRead ) ;
+	accelerator_for(ss,unu_v.size(), Field::vector_object::Nsimd(),{
+	    coalescedWrite( tmp_v[ss]  ,
+			    -st_v[ss]*(rho_numu*ilnu_v[ss]+rho_munu*unu_v[ss]*sh2_v[ss]*adj(unu_v[ss]))
+			    +rho_numu*sh_v[ss]*st_v[ss]
+			    ) ;
+	  }) ;
+      }
+      Gimpl::AddLink(SigmaTerm, temp_Sigma, mu);
+
+      // reset temp_Sigma
+      staple = adj(u_tmp)*adj(u[mu]) ;
+      // one can get a small speedup by pre-forming this product at the cost of a gauge field
+      u_tmp = adj(u[nu])*il[nu];
+      sh_field = Cshift(u_tmp, mu, 1);
+      {
+	autoView( tmp_v  , temp_Sigma , AcceleratorWrite ) ;
+	autoView( sh_v   , sh_field , AcceleratorRead ) ;
+	autoView( st_v   , staple   , AcceleratorRead ) ;
+	autoView( unu_v  , u[nu]    , AcceleratorRead ) ;
+	autoView( umu_v  , u[mu]    , AcceleratorRead ) ;
+	autoView( ilmu_v , il[mu]   , AcceleratorRead ) ;
+	autoView( ilnu_v , il[nu]   , AcceleratorRead ) ;
+	accelerator_for(ss,unu_v.size(), Field::vector_object::Nsimd(),{
+	    coalescedWrite( tmp_v[ss]  ,
+			    ( st_v[ss]*(-rho_munu*ilmu_v[ss]+rho_numu*ilnu_v[ss])
+			      -rho_numu*sh_v[ss]*adj(umu_v[ss]) )*unu_v[ss] 		    
+			    ) ;
+	  }) ;
+      }
+      sh_field = Cshift(temp_Sigma, nu, -1);
+      Gimpl::AddLink(SigmaTerm, sh_field, mu);
+    }
+  }
+}
+
 int main (int argc, char ** argv)
 {
   Grid_init(&argc,&argv);
@@ -461,6 +706,35 @@ int main (int argc, char ** argv)
     std::cout<<"Norm iL "<< norm2(iLambda2-iLambda1)<<std::endl<<std::endl ;
   }
 
+  LatticeGaugeField u_smr(&Grid) , u_smr2(&Grid) ;
+  double start = usecond() ;
+  smear( u_smr , Umu ) ;
+  std::cout<<"Cup computation "<< (usecond()-start)/1e3 << std::endl ;
 
+  start = usecond() ;
+  smear_nuunroll( u_smr2 , Umu ) ;
+  std::cout<<"Cup nuunroll "<< (usecond()-start)/1e3 << std::endl ;
+
+  for(int mu = 0 ; mu < Nd ; mu++ ) {
+    std::cout<<"Norm "<< norm2( PeekIndex<LorentzIndex>(u_smr,mu)
+				- PeekIndex<LorentzIndex>(u_smr2,mu) ) << std::endl ;
+      }
+
+
+  LatticeGaugeField dU(&Grid) , dU2(&Grid) ;
+  start = usecond() ;
+  derivative<PeriodicGimplR>( dU , u_smr2 , Umu ) ;
+  std::cout<<"Derivative timer " << (usecond()-start)/1e3 << std::endl ;
+
+  start = usecond() ;
+  derivative_new<PeriodicGimplR>( dU2 , u_smr2 , Umu ) ;
+  std::cout<<"Derivative new timer " << (usecond()-start)/1e3 << std::endl ;
+
+  for(int mu = 0 ; mu < Nd ; mu++ ) {
+    std::cout<<"Norm "<< norm2( PeekIndex<LorentzIndex>(dU,mu)
+				- PeekIndex<LorentzIndex>(dU2,mu) ) << std::endl ;
+      }
+  
+  
   Grid_finalize();
 }
