@@ -82,7 +82,7 @@ public:
 	autoView( tmp2_v        , tmp2        , AcceleratorRead ) ;
 	autoView( unu_v         , u[nu]       , AcceleratorRead ) ;
 	autoView( umu_v         , u[mu]       , AcceleratorRead ) ;
-	accelerator_for(ss,unu_v.size(), Field::vector_object::Nsimd(),{
+	accelerator_for(ss,unu_v.size(), GaugeField::vector_object::Nsimd(),{
 	    tmp_staple_v[ss] = unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ;
 	    tmp_staple2_v[ss] = adj(unu_v[ss])*umu_v[ss]*(tmp_v[ss]) ;
 	  }) ;
@@ -101,7 +101,7 @@ public:
 	autoView( tmp2_v        , tmp2        , AcceleratorRead ) ;
 	autoView( unu_v         , u[nu]       , AcceleratorRead ) ;
 	autoView( umu_v         , u[mu]       , AcceleratorRead ) ;
-	accelerator_for(ss,unu_v.size(), Field::vector_object::Nsimd(),{
+	accelerator_for(ss,unu_v.size(), GaugeField::vector_object::Nsimd(),{
 	    tmp_staple_v[ss] = unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ;
 	    tmp_staple2_v[ss] = adj(unu_v[ss])*umu_v[ss]*(tmp_v[ss]) ;
 	  }) ;
@@ -120,7 +120,7 @@ public:
 	autoView( tmp2_v        , tmp2        , AcceleratorRead ) ;
 	autoView( unu_v         , u[nu]       , AcceleratorRead ) ;
 	autoView( umu_v         , u[mu]       , AcceleratorRead ) ;
-	accelerator_for(ss,unu_v.size(), Field::vector_object::Nsimd(),{
+	accelerator_for(ss,unu_v.size(), GaugeField::vector_object::Nsimd(),{
 	    tmp_staple_v[ss] = unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ;
 	    tmp_staple2_v[ss] = adj(unu_v[ss])*umu_v[ss]*(tmp_v[ss]) ;
 	  }) ;
@@ -137,9 +137,9 @@ public:
 		  const GaugeField& iLambda,
 		  const GaugeField& U)const{
   GridBase *grid = U.Grid();
-  LatticeColourMatrix staple(grid), u_tmp(grid) ;
-  LatticeColourMatrix sh_field(grid), temp_Sigma(grid) ;
-  std::vector<LatticeColourMatrix> u(Nd, grid), il(Nd, grid) ;
+  GaugeLinkField staple(grid), u_tmp(grid) , tmp(grid) ;
+  GaugeLinkField sh_field(grid), temp_Sigma(grid) ;
+  std::vector<GaugeLinkField> u(Nd, grid), il(Nd, grid) ;
   Real rho_munu = 0. , rho_numu = 0. ;
   for (int d = 0; d < Nd; d++) {
     u[d] = PeekIndex<LorentzIndex>(U, d);
@@ -156,14 +156,15 @@ public:
       u_tmp = Cshift(u[nu],mu,1) ;
       staple = adj(u[nu]*Cshift(u[mu],nu,1)*adj(u_tmp)) ;
       sh_field = Cshift(il[nu], mu, 1);
+      tmp = Cshift(il[mu], nu, 1) ;
       {
 	autoView( tmp_v  , temp_Sigma , AcceleratorWrite ) ;
-	autoView( sh_v   , sh_field , AcceleratorRead ) ;
-	autoView( sh2_v  , Cshift(il[mu], nu, 1) , AcceleratorRead ) ;
-	autoView( st_v   , staple   , AcceleratorRead ) ;
-	autoView( unu_v  , u[nu]    , AcceleratorRead ) ;
-	autoView( ilnu_v , il[nu]   , AcceleratorRead ) ;
-	accelerator_for(ss,unu_v.size(), Field::vector_object::Nsimd(),{
+	autoView( sh_v   , sh_field   , AcceleratorRead ) ;
+	autoView( sh2_v  , tmp        , AcceleratorRead ) ;
+	autoView( st_v   , staple     , AcceleratorRead ) ;
+	autoView( unu_v  , u[nu]      , AcceleratorRead ) ;
+	autoView( ilnu_v , il[nu]     , AcceleratorRead ) ;
+	accelerator_for(ss,unu_v.size(), GaugeField::vector_object::Nsimd(),{
 	    tmp_v[ss] = -st_v[ss]*(rho_numu*ilnu_v[ss]+rho_munu*unu_v[ss]*sh2_v[ss]*adj(unu_v[ss]))
 	      +rho_numu*sh_v[ss]*st_v[ss] ;
 	  }) ;
@@ -177,13 +178,13 @@ public:
       sh_field = Cshift(u_tmp, mu, 1);
       {
 	autoView( tmp_v  , temp_Sigma , AcceleratorWrite ) ;
-	autoView( sh_v   , sh_field , AcceleratorRead ) ;
-	autoView( st_v   , staple   , AcceleratorRead ) ;
-	autoView( unu_v  , u[nu]    , AcceleratorRead ) ;
-	autoView( umu_v  , u[mu]    , AcceleratorRead ) ;
-	autoView( ilmu_v , il[mu]   , AcceleratorRead ) ;
-	autoView( ilnu_v , il[nu]   , AcceleratorRead ) ;
-	accelerator_for(ss,unu_v.size(), Field::vector_object::Nsimd(),{
+	autoView( sh_v   , sh_field   , AcceleratorRead ) ;
+	autoView( st_v   , staple     , AcceleratorRead ) ;
+	autoView( unu_v  , u[nu]      , AcceleratorRead ) ;
+	autoView( umu_v  , u[mu]      , AcceleratorRead ) ;
+	autoView( ilmu_v , il[mu]     , AcceleratorRead ) ;
+	autoView( ilnu_v , il[nu]     , AcceleratorRead ) ;
+	accelerator_for(ss,unu_v.size(), GaugeField::vector_object::Nsimd(),{
 	    tmp_v[ss] = ( st_v[ss]*(-rho_munu*ilmu_v[ss]+rho_numu*ilnu_v[ss])
 			  -rho_numu*sh_v[ss]*adj(umu_v[ss]) )*unu_v[ss] ;
 	  }) ;
