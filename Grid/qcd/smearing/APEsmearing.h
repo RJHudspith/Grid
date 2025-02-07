@@ -68,47 +68,7 @@ public:
     std::vector<GaugeLinkField> u(Nd, grid);
     for (int d = 0; d < Nd; d++) {
       u[d] = PeekIndex<LorentzIndex>(U, d);
-    }
-    /*
-    for(int mu=0; mu<Nd; ++mu){
-      Cup = Zero();
-      for(int nu=0; nu<Nd; ++nu){
-	if (nu != mu) {
-	  tmp = Cshift(u[nu],mu,1) ;
-	  tmp_staple  = u[nu]*Cshift(u[mu],nu,1)*adj(tmp) ;
-	  
-	  tmp_staple += Cshift(adj(u[nu])*u[mu]*tmp,nu,-1) ;
-	  Cup += adj(tmp_staple)*rho[mu+Nd*nu] ;
-	}
-      }
-      pokeLorentz(u_smr, adj(Cup), mu); 
-    }
-    */
-    /*
-      const int mp[4][3] = { {1,2,3} , {0,2,3} , {0,1,3} , {0,1,2} } ;
-    for(int mu=0; mu<Nd; ++mu){
-      int nu = mp[mu][0] ;
-      tmp = Cshift(u[nu],mu,1) ;
-      tmp_staple  = u[nu]*Cshift(u[mu],nu,1)*adj(tmp) ;
-      tmp_staple += Cshift(adj(u[nu])*u[mu]*tmp,nu,-1) ;
-      Cup  = (tmp_staple)*rho[mu+Nd*mp[mu][0]];
-
-      nu = mp[mu][1] ;
-      tmp = Cshift(u[nu],mu,1) ;
-      tmp_staple  = u[nu]*Cshift(u[mu],nu,1)*adj(tmp) ;
-      tmp_staple += Cshift(adj(u[nu])*u[mu]*tmp,nu,-1) ;
-      Cup += (tmp_staple)*rho[mu+Nd*mp[mu][1]];
-      
-      nu = mp[mu][2] ;
-      tmp = Cshift(u[nu],mu,1) ;
-      tmp_staple  = u[nu]*Cshift(u[mu],nu,1)*adj(tmp) ;
-      tmp_staple += Cshift(adj(u[nu])*u[mu]*tmp,nu,-1) ;
-      Cup += (tmp_staple)*rho[mu+Nd*mp[mu][2]];
-
-      pokeLorentz(u_smr, Cup, mu); 
-    }
-    */
-    
+    }    
     const int mp[4][3] = { {1,2,3} , {0,2,3} , {0,1,3} , {0,1,2} } ;
     for(int mu=0; mu<Nd; ++mu){
       // first ortho dir
@@ -123,8 +83,8 @@ public:
 	autoView( unu_v         , u[nu]       , AcceleratorRead ) ;
 	autoView( umu_v         , u[mu]       , AcceleratorRead ) ;
 	accelerator_for(ss,unu_v.size(), Field::vector_object::Nsimd(),{
-	    coalescedWrite( tmp_staple_v[ss]  , unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ) ;
-	    coalescedWrite( tmp_staple2_v[ss] , adj(unu_v[ss])*umu_v[ss]*(tmp_v[ss]) ) ;
+	    tmp_staple_v[ss] = unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ;
+	    tmp_staple2_v[ss] = adj(unu_v[ss])*umu_v[ss]*(tmp_v[ss]) ;
 	  }) ;
       }
       tmp_staple += Cshift(tmp_staple2,nu,-1) ;      
@@ -142,8 +102,8 @@ public:
 	autoView( unu_v         , u[nu]       , AcceleratorRead ) ;
 	autoView( umu_v         , u[mu]       , AcceleratorRead ) ;
 	accelerator_for(ss,unu_v.size(), Field::vector_object::Nsimd(),{
-	    coalescedWrite( tmp_staple_v[ss]  , unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ) ;
-	    coalescedWrite( tmp_staple2_v[ss] , adj(unu_v[ss])*umu_v[ss]*(tmp_v[ss]) ) ;
+	    tmp_staple_v[ss] = unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ;
+	    tmp_staple2_v[ss] = adj(unu_v[ss])*umu_v[ss]*(tmp_v[ss]) ;
 	  }) ;
       }
       tmp_staple += Cshift(tmp_staple2,nu,-1) ;      
@@ -161,8 +121,8 @@ public:
 	autoView( unu_v         , u[nu]       , AcceleratorRead ) ;
 	autoView( umu_v         , u[mu]       , AcceleratorRead ) ;
 	accelerator_for(ss,unu_v.size(), Field::vector_object::Nsimd(),{
-	    coalescedWrite( tmp_staple_v[ss]  , unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ) ;
-	    coalescedWrite( tmp_staple2_v[ss] , adj(unu_v[ss])*umu_v[ss]*(tmp_v[ss]) ) ;
+	    tmp_staple_v[ss] = unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ;
+	    tmp_staple2_v[ss] = adj(unu_v[ss])*umu_v[ss]*(tmp_v[ss]) ;
 	  }) ;
       }
       tmp_staple += Cshift(tmp_staple2,nu,-1) ;      
@@ -204,10 +164,8 @@ public:
 	autoView( unu_v  , u[nu]    , AcceleratorRead ) ;
 	autoView( ilnu_v , il[nu]   , AcceleratorRead ) ;
 	accelerator_for(ss,unu_v.size(), Field::vector_object::Nsimd(),{
-	    coalescedWrite( tmp_v[ss]  ,
-			    -st_v[ss]*(rho_numu*ilnu_v[ss]+rho_munu*unu_v[ss]*sh2_v[ss]*adj(unu_v[ss]))
-			    +rho_numu*sh_v[ss]*st_v[ss]
-			    ) ;
+	    tmp_v[ss] = -st_v[ss]*(rho_numu*ilnu_v[ss]+rho_munu*unu_v[ss]*sh2_v[ss]*adj(unu_v[ss]))
+	      +rho_numu*sh_v[ss]*st_v[ss] ;
 	  }) ;
       }
       Gimpl::AddLink(SigmaTerm, temp_Sigma, mu);
@@ -226,10 +184,8 @@ public:
 	autoView( ilmu_v , il[mu]   , AcceleratorRead ) ;
 	autoView( ilnu_v , il[nu]   , AcceleratorRead ) ;
 	accelerator_for(ss,unu_v.size(), Field::vector_object::Nsimd(),{
-	    coalescedWrite( tmp_v[ss]  ,
-			    ( st_v[ss]*(-rho_munu*ilmu_v[ss]+rho_numu*ilnu_v[ss])
-			      -rho_numu*sh_v[ss]*adj(umu_v[ss]) )*unu_v[ss] 		    
-			    ) ;
+	    tmp_v[ss] = ( st_v[ss]*(-rho_munu*ilmu_v[ss]+rho_numu*ilnu_v[ss])
+			  -rho_numu*sh_v[ss]*adj(umu_v[ss]) )*unu_v[ss] ;
 	  }) ;
       }
       sh_field = Cshift(temp_Sigma, nu, -1);
