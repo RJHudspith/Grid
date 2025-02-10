@@ -136,64 +136,48 @@ public:
   void derivative(GaugeField& SigmaTerm,
 		  const GaugeField& iLambda,
 		  const GaugeField& U)const{
-  GridBase *grid = U.Grid();
-  GaugeLinkField staple(grid), u_tmp(grid) , tmp(grid) ;
-  GaugeLinkField sh_field(grid), temp_Sigma(grid) ;
-  std::vector<GaugeLinkField> u(Nd, grid), il(Nd, grid) ;
-  Real rho_munu = 0. , rho_numu = 0. ;
-  for (int d = 0; d < Nd; d++) {
-    u[d] = PeekIndex<LorentzIndex>(U, d);
-    il[d] = PeekIndex<LorentzIndex>(iLambda, d);
-  }
-
-  for(int mu = 0; mu < Nd; ++mu){
-    for(int nu = 0; nu < Nd; ++nu){
-      if(nu==mu) continue;
-
-      rho_munu = rho[mu + Nd * nu];
-      rho_numu = rho[nu + Nd * mu]; 
-
-      u_tmp = Cshift(u[nu],mu,1) ;
-      staple = adj(u[nu]*Cshift(u[mu],nu,1)*adj(u_tmp)) ;
-      sh_field = Cshift(il[nu], mu, 1);
-      tmp = Cshift(il[mu], nu, 1) ;
-      {
-	autoView( tmp_v  , temp_Sigma , AcceleratorWrite ) ;
-	autoView( sh_v   , sh_field   , AcceleratorRead ) ;
-	autoView( sh2_v  , tmp        , AcceleratorRead ) ;
-	autoView( st_v   , staple     , AcceleratorRead ) ;
-	autoView( unu_v  , u[nu]      , AcceleratorRead ) ;
-	autoView( ilnu_v , il[nu]     , AcceleratorRead ) ;
-	accelerator_for(ss,unu_v.size(), GaugeField::vector_object::Nsimd(),{
-	    tmp_v[ss] = -st_v[ss]*(rho_numu*ilnu_v[ss]+rho_munu*unu_v[ss]*sh2_v[ss]*adj(unu_v[ss]))
-	      +rho_numu*sh_v[ss]*st_v[ss] ;
-	  }) ;
+    GridBase *grid = U.Grid();
+    GaugeLinkField u_tmp1(grid) , u_tmp2(grid) , sh1(grid) , sh2(grid) , temp_Sigma(grid) ;
+    std::vector<GaugeLinkField> u(Nd, grid), il(Nd, grid) ;
+    Real rho_munu = 0. , rho_numu = 0. ;
+    for (int d = 0; d < Nd; d++) {
+      u[d] = PeekIndex<LorentzIndex>(U, d);
+      il[d] = PeekIndex<LorentzIndex>(iLambda, d);
+    }
+    for(int mu = 0; mu < Nd; ++mu){
+      for(int nu = 0; nu < Nd; ++nu){
+        if(nu==mu) continue;
+        rho_munu = rho[mu + Nd * nu];
+        rho_numu = rho[nu + Nd * mu];
+        u_tmp1 = Cshift(u[nu]  , mu , 1 ) ;
+        u_tmp2 = Cshift(u[mu]  , nu , 1 ) ;
+        sh1    = Cshift(il[nu] , mu , 1 ) ;
+        sh2    = Cshift(il[mu] , nu , 1 ) ;
+        {
+          autoView( temp_Sigma_v , temp_Sigma , AcceleratorWrite ) ;
+          autoView( u_tmp1_v     , u_tmp1     , AcceleratorWrite ) ;
+          autoView( sh1_v        , sh1        , AcceleratorRead ) ;
+          autoView( sh2_v        , sh2        , AcceleratorRead ) ;
+          autoView( u_tmp2_v     , u_tmp2     , AcceleratorRead ) ;
+          autoView( unu_v        , u[nu]      , AcceleratorRead ) ;
+          autoView( umu_v        , u[mu]      , AcceleratorRead ) ;
+	            autoView( ilmu_v       , il[mu]     , AcceleratorRead ) ;
+          autoView( ilnu_v       , il[nu]     , AcceleratorRead ) ;
+          accelerator_for(ss,unu_v.size(), GaugeLinkField::vector_object::Nsimd(),{
+              auto st = adj(unu_v[ss]*u_tmp2_v[ss]*adj(u_tmp1_v[ss])) ;
+              temp_Sigma_v[ss] = -st*(rho_numu*ilnu_v[ss]+rho_munu*unu_v[ss]*sh2_v[ss]*adj(unu_v[ss]))
+                +rho_numu*sh1_v[ss]*st ;
+              st = adj(u_tmp1_v[ss])*adj(umu_v[ss]) ;
+              auto sh3 = adj(u_tmp1_v[ss])*sh1_v[ss] ;
+              u_tmp1_v[ss] = ( st*(-rho_munu*ilmu_v[ss]+rho_numu*ilnu_v[ss])
+                               -rho_numu*sh3*adj(umu_v[ss]) )*unu_v[ss] ;
+            }) ;
+        }
+        sh1 = Cshift(u_tmp1, nu, -1) + temp_Sigma ;
+        Gimpl::AddLink(SigmaTerm, sh1, mu);
       }
-      Gimpl::AddLink(SigmaTerm, temp_Sigma, mu);
-
-      // reset temp_Sigma
-      staple = adj(u_tmp)*adj(u[mu]) ;
-      // one can get a small speedup by pre-forming this product at the cost of a gauge field
-      u_tmp = adj(u[nu])*il[nu];
-      sh_field = Cshift(u_tmp, mu, 1);
-      {
-	autoView( tmp_v  , temp_Sigma , AcceleratorWrite ) ;
-	autoView( sh_v   , sh_field   , AcceleratorRead ) ;
-	autoView( st_v   , staple     , AcceleratorRead ) ;
-	autoView( unu_v  , u[nu]      , AcceleratorRead ) ;
-	autoView( umu_v  , u[mu]      , AcceleratorRead ) ;
-	autoView( ilmu_v , il[mu]     , AcceleratorRead ) ;
-	autoView( ilnu_v , il[nu]     , AcceleratorRead ) ;
-	accelerator_for(ss,unu_v.size(), GaugeField::vector_object::Nsimd(),{
-	    tmp_v[ss] = ( st_v[ss]*(-rho_munu*ilmu_v[ss]+rho_numu*ilnu_v[ss])
-			  -rho_numu*sh_v[ss]*adj(umu_v[ss]) )*unu_v[ss] ;
-	  }) ;
-      }
-      sh_field = Cshift(temp_Sigma, nu, -1);
-      Gimpl::AddLink(SigmaTerm, sh_field, mu);
     }
   }
-  }  
 };
 
 NAMESPACE_END(Grid);

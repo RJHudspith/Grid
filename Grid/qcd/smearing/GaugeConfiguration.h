@@ -119,6 +119,7 @@ protected:
     return SmearedSet[Level];
   }
 
+public:
   //====================================================================
   void set_iLambda(GaugeLinkField& iLambda,
 		   GaugeLinkField& e_iQ,
@@ -127,100 +128,89 @@ protected:
                    const GaugeLinkField& GaugeK) const 
   {
     GridBase* grid = iQ.Grid();
-    GaugeLinkField B1(grid), B2(grid) ;
-    LatticeComplex LatticeUnitComplex(grid);
-    LatticeUnitComplex = 1.0;
-
-    GaugeLinkField iQ2 = iQ*iQ;
-
-    // sign in c0 from the conventions on the Ta
-    LatticeComplex u = -imag(trace(iQ2*iQ))*0.3333333333333333148 ;
-    LatticeComplex w = -real(trace(iQ2))*0.5;
-    LatticeComplex f0 = 0.3849001794597505244*w ;
-    w = sqrt(w) ;
-    f0 = f0*w ;
-    f0 = acos(u/f0)*0.3333333333333333148;
-    u = w*(0.5773502691896257311)*cos(f0);
-    w = w*sin(f0);
-
-    const LatticeComplex xi0 = StoutSmearing -> func_xi0(w);
-    LatticeComplex f2 = timesI( xi0 );
-    const LatticeComplex u2 = u * u;
-    const LatticeComplex w2 = w * w;
-    const LatticeComplex xi1 = StoutSmearing -> func_xi1(w);
-    // set w to cos(w) as the actual value of w is not used after here
-    w = cos(w);
-    
-    LatticeComplex emiu = cos(u) - timesI(sin(u));
-    //LatticeComplex e2iu = adj(emiu)*adj(emiu) ; weirdly sensitive to this ....
-    u *= 2. ;
-    LatticeComplex e2iu = cos(u) + timesI(sin(u));
-    
-    f0 = e2iu * (u2 - w2) + emiu * ((8.0*u2 * w) + (u * (3.0*u2 + w2) * f2));
-    LatticeComplex f1 = e2iu*u - emiu * ((u * w) - (3.0*u2 - w2) * f2);
-    f2 = e2iu - emiu * (w + (1.5*u) * f2);
-    
-    const LatticeComplex r01 = (u + timesI(2.0*(u2 - w2))) * e2iu +
-      emiu * ((8.*u*w + u * (3.0 * u2 + w2) * xi0) +
-	      timesI(-8.0 * u2 * w + 2.0 * (9.0 * u2 + w2) * xi0));
-    
-    const LatticeComplex r11 = (2.0 * LatticeUnitComplex + timesI(2.0*u)) * e2iu +
-      emiu * ((-2.0 * w + (3.0 * u2 - w2) * xi0) +
-	      timesI(u*(w + 3.0*xi0)));
-    
-    const LatticeComplex r21 = 2.0*timesI(e2iu) + emiu * (-1.5*u * xi0 + timesI(w - 3.0 * xi0));
-    
-    const LatticeComplex r02 = -2.0 * e2iu +
-      emiu * (-8.0*u2*xi0 + timesI(u * (w + xi0 + 3.0*u2*xi1)));
-
-    const LatticeComplex r12 = emiu * (u * xi0 + timesI(-w - xi0 + 3.0*u2*xi1));
-
-    const LatticeComplex r22 = emiu * (xi0 - timesI(1.5*u * xi1));
-    
-    w = 1.0 ; 
-    w = w / (9.0 * u2 - w2);  // reals
-    f0 = f0 * w ;
-    f1 = f1 * w ;
-    f2 = f2 * w ;
-
-    w *= (0.5*w) ;
-    
-    // exponentiate B1
-    emiu = 3.*u2 - w2 ;
-    e2iu = 30.*u2 + 2.*w2 ;
-    LatticeComplex b0 = u*r01 + emiu*r02 - e2iu*f0;
-    LatticeComplex b1 = u*r11 + emiu*r12 - e2iu*f1;
-    LatticeComplex b2 = u*r21 + emiu*r22 - e2iu*f2;
-    b0 *= w;
-    b1 *= w;
-    b2 *= w;
-    B1 = 1.0 ;
-    B1 = b0*B1 + timesMinusI(b1)*iQ - b2*iQ2;
-
-    // exponentiate B2
-    emiu = 1.5*u ;
-    e2iu = 12.*u ;
-    b0 = r01 - emiu*r02 - e2iu*f0;
-    b1 = r11 - emiu*r12 - e2iu*f1;
-    b2 = r21 - emiu*r22 - e2iu*f2;
-    b0 *= w;
-    b1 *= w;
-    b2 *= w;
-    B2 = 1.0 ;
-    B2 = b0*B2 + timesMinusI(b1)*iQ - b2*iQ2;
-
-    // compute sigmap, which we reuse the space for e_iQ
-    e_iQ = GaugeK * Sigmap;
-    iLambda = Ta( trace(e_iQ * B1) * iQ - timesI( trace(e_iQ * B2) )*iQ2 +
-		  timesI(f1) * e_iQ + f2 * (iQ * e_iQ + e_iQ * iQ) );
-
-    // finally return the exponential
-    e_iQ = 1.0 ;
-    e_iQ = f0*e_iQ + timesMinusI(f1)*iQ - f2*iQ2;
+    LatticeComplex LatticeUnit(grid); LatticeUnit = 1.0;
+    e_iQ = GaugeK*Sigmap;
+    iLambda = 1.0 ;
+    {
+      autoView( iLambda_v , iLambda     , AcceleratorWrite ) ;
+      autoView( e_iQ_v    , e_iQ        , AcceleratorWrite ) ;
+      autoView( iQ_v      , iQ          , AcceleratorRead ) ;
+      autoView( Id_v      , LatticeUnit , AcceleratorRead ) ;
+      accelerator_for(ss,iLambda_v.size(), LatticeColourMatrix::vector_object::Nsimd(),{
+	  const auto iQ2 = iQ_v[ss]*iQ_v[ss] ;
+	  // sign in c0 from the conventions on the Ta                        
+	  auto u = -imag(trace(iQ2*iQ_v[ss]))*0.3333333333333333148 ;
+	  auto w = -real(trace(iQ2))*0.5;
+	  auto f0 = 0.3849001794597505244*w ;
+	  w = sqrt(w) ;
+	  f0 = f0*w ;
+	  f0 = acos(u/f0)*0.3333333333333333148;
+	  u = w*(0.5773502691896257311)*cos(f0);
+	  w = w*sin(f0);
+	  const auto xi0 = sin(w)/w;
+	  auto f2        = timesI( xi0 );
+	  const auto u2  = u * u;
+	  const auto w2  = w * w;
+	  const auto xi1 = cos(w)/(w * w) - sin(w)/(w*w*w);
+	  // set w to cos(w) as the actual value of w is not used after here
+	  w = cos(w);
+	  auto emiu = cos(u) - timesI(sin(u));
+	  //LatticeComplex e2iu = adj(emiu)*adj(emiu) ; weirdly sensitive to this ....
+	  u = 2.*u ;
+	  auto e2iu = cos(u) + timesI(sin(u));
+	  f0 = e2iu * (u2 - w2) + emiu * ((8.0*u2 * w) + (u * (3.0*u2 + w2) * f2));
+	  auto f1 = e2iu*u - emiu * ((u * w) - (3.0*u2 - w2) * f2);
+	  f2 = e2iu - emiu * (w + (1.5*u) * f2);
+	  const auto r01 = (u + timesI(2.0*(u2 - w2))) * e2iu +
+	    emiu * ((8.*u*w + u * (3.0 * u2 + w2) * xi0) +
+		    timesI(-8.0 * u2 * w + 2.0 * (9.0 * u2 + w2) * xi0));
+	  const auto r11 = (2.0 * Id_v[ss] + timesI(2.0*u)) * e2iu +
+	    emiu * ((-2.0 * w + (3.0 * u2 - w2) * xi0) +
+		    timesI(u*(w + 3.0*xi0)));
+	  const auto r21 = 2.0*timesI(e2iu) + emiu * (-1.5*u * xi0 + timesI(w - 3.0 * xi0));
+	  const auto r02 = -2.0 * e2iu +
+	    emiu * (-8.0*u2*xi0 + timesI(u * (w + xi0 + 3.0*u2*xi1)));
+	  const auto r12 = emiu * (u * xi0 + timesI(-w - xi0 + 3.0*u2*xi1));
+	  const auto r22 = emiu * (xi0 - timesI(1.5*u * xi1));
+	  w = 1.0 ;
+	  w = w / (9.0 * u2 - w2);  // reals                 
+	  f0 = f0 * w ;
+	  f1 = f1 * w ;
+	  f2 = f2 * w ;
+	  w *= (0.5*w) ;
+	  // B1          
+	  auto EMIU = 3.*u2 - w2 ;
+	  auto E2IU = 30.*u2 + 2.*w2 ;
+	  auto b0_v = u*r01 + EMIU*r02 - E2IU*f0;
+	  auto b1_v = u*r11 + EMIU*r12 - E2IU*f1;
+	  auto b2_v = u*r21 + EMIU*r22 - E2IU*f2;
+	  b0_v *= w;
+	  b1_v *= w;
+	  b2_v *= w;
+	  auto B1 = b0_v*iLambda_v[ss] + timesMinusI(b1_v)*iQ_v[ss] - b2_v*iQ2;
+	  // B2              
+	  EMIU = 1.5*u ;
+	  E2IU = 12.*u ;
+	  b0_v = r01 - EMIU*r02 - E2IU*f0;
+	  b1_v = r11 - EMIU*r12 - E2IU*f1;
+	  b2_v = r21 - EMIU*r22 - E2IU*f2;
+	  b0_v *= w;
+	  b1_v *= w;
+	  b2_v *= w;
+	  auto B2 = b0_v*iLambda_v[ss] + timesMinusI(b1_v)*iQ_v[ss] - b2_v*iQ2;
+	  // compute iLambda              
+	  iLambda_v[ss]  = trace(e_iQ_v[ss] * B1) * iQ_v[ss] ;
+	  iLambda_v[ss] -= timesI( trace(e_iQ_v[ss] * B2) )*iQ2 ;
+	  iLambda_v[ss] += timesI(f1) * e_iQ_v[ss] ;
+	  iLambda_v[ss] += f2*( iQ_v[ss]*e_iQ_v[ss] + e_iQ_v[ss]*iQ_v[ss] ) ;
+	  iLambda_v[ss]  = Ta( iLambda_v[ss] ) ;
+	  // exponentiate
+	  B1 = 1 ;
+	  e_iQ_v[ss] = f0*B1 + timesMinusI(f1)*iQ_v[ss] - f2*iQ2 ;
+        });
+    }
   }
-
   //====================================================================
-public:
 
   /* Standard constructor */
   SmearedConfiguration(GridCartesian* UGrid, unsigned int Nsmear,

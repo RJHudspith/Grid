@@ -15,7 +15,9 @@ NAMESPACE_BEGIN(Grid);
 //#define b416
 //#define b4238
 //#define b4300
+//#define b4333
 
+//#define L48
 //#define L32
 #define L24
 //#define L20
@@ -207,7 +209,6 @@ int main(int argc, char **argv) {
   #else
     #error "L not supported"
   #endif
-  std::cout<<"aml,ams,amx = " << light_mass << " , " << strange_mass << " , " << charm_mass << std::endl ;
 #elif (defined b4068)
   const int Ls            = 8;
   const Real beta         = 4.068;
@@ -232,7 +233,6 @@ int main(int argc, char **argv) {
   #else
     #error "L not supported for these parameters"
   #endif
-  std::cout<<"aml,ams,amx = " << light_mass << " , " << strange_mass << " , " << charm_mass << std::endl ;
     ///   
 #elif (defined b416)
   const int Ls            = 6;
@@ -252,11 +252,10 @@ int main(int argc, char **argv) {
   #else
     #error "Chosen L not supported"
   #endif
-  std::cout<<"aml,ams,amx = " << light_mass << " , " << strange_mass << " , " << charm_mass << std::endl ;
 #elif (defined b4238)
   const int Ls            = 4;
   const Real beta         = 4.238;
-  const Real strange_mass = 0.029;
+  const Real strange_mass = 0.0295;
   const Real charm_mass   = 11.8*strange_mass ;
   const Real pv_mass      = 1.0;
   const RealD M5          = 1.0;
@@ -271,31 +270,52 @@ int main(int argc, char **argv) {
   #else
     #error "L not supported"
   #endif 
-  std::cout<<"aml,ams,amx = " << light_mass << " , " << strange_mass << " , " << charm_mass << std::endl ;
 #elif (defined b4300)
   const int Ls            = 4;
   const Real beta         = 4.3;
-  const Real strange_mass = 0.023;
+  const Real strange_mass = 0.0245;
   const Real charm_mass   = 11.8*strange_mass ;
   const Real pv_mass      = 1.0;
   const RealD M5          = 1.0;
   const RealD b           = 1.175;
   const RealD c           = 0.175;
+  #ifdef L48
+  const Real light_mass   = 0.0035;
+  std::vector<Real> hasenbusch( { 0.008, 0.12, 0.35 } ) ;  
+  #elif (defined L32)
+  const Real light_mass   = 0.008;
+  std::vector<Real> hasenbusch( { 0.03, 0.12, 0.35 } ) ;  
+  #else
+    #error "L not supported"
+  #endif
+#elif (defined b4333)
+  const int Ls            = 4;
+  const Real beta         = 4.333;
+  const Real strange_mass = 0.021;
+  const Real charm_mass   = 11.8*strange_mass ;
+  const Real pv_mass      = 1.0;
+  const RealD M5          = 1.0;
+  const RealD b           = 1.15;
+  const RealD c           = 0.15;
   #ifdef L32
-    const Real light_mass   = 0.0095;
+    const Real light_mass   = 0.009;
     std::vector<Real> hasenbusch( { 0.03, 0.12, 0.35 } ) ;  
   #else
     #error "L not supported"
   #endif
-  std::cout<<"aml,ams,amx = " << light_mass << " , " << strange_mass << " , " << charm_mass << std::endl ;
 #else
   exit(1) ;
 #endif
+  std::cout<<"aml,ams,amx = " << light_mass << " , " << strange_mass << " , " << charm_mass << std::endl ;
   
   auto GridPtr   = TheHMC.Resources.GetCartesian();
   auto GridRBPtr = TheHMC.Resources.GetRBCartesian();
   auto FGrid     = SpaceTimeGrid::makeFiveDimGrid(Ls,GridPtr);
   auto FrbGrid   = SpaceTimeGrid::makeFiveDimRedBlackGrid(Ls,GridPtr);
+
+  std::cout<<GridLogMessage<<"Double-precison grid"<<std::endl ;
+  GridPtr -> show_decomposition() ;
+  FrbGrid -> show_decomposition() ;
 
   Coordinate latt  = GridDefaultLatt();
   Coordinate mpi   = GridDefaultMpi();
@@ -305,6 +325,11 @@ int main(int argc, char **argv) {
   auto GridRBPtrF  = SpaceTimeGrid::makeFourDimRedBlackGrid(GridPtrF);
   auto FGridF      = SpaceTimeGrid::makeFiveDimGrid(Ls,GridPtrF);
   auto FrbGridF    = SpaceTimeGrid::makeFiveDimRedBlackGrid(Ls,GridPtrF);
+
+  std::cout<<GridLogMessage<<"Single-precison grid"<<std::endl ;
+  GridPtrF -> show_decomposition() ;
+  FrbGridF -> show_decomposition() ;
+
 
   // temporarily need a gauge field
   LatticeGaugeField U(GridPtr);
@@ -359,7 +384,7 @@ int main(int argc, char **argv) {
   #elif (defined L24)
     std::vector<double> EOFAhs = { strange_mass , 0.2 , charm_mass } ;
   #endif
-#elif (defined b416) || (defined b4068) || (defined b4238) || (defined b4300)
+#elif (defined b416) || (defined b4068) || (defined b4238) || (defined b4300) || (defined b4333)
   std::vector<double> EOFAhs = { strange_mass , charm_mass } ;
 #endif
   std::vector<MobiusEOFAFermionD*> Strange_Op_L  , Strange_Op_R  ;
@@ -408,7 +433,7 @@ int main(int argc, char **argv) {
     #else
     Level1.push_back( EOFA[i] );
     #endif
-#elif (defined b4238) || (defined b4300)
+#elif (defined b4238) || (defined b4300) || (defined b4333)
     Level1.push_back( EOFA[i] );
 #endif
   }
@@ -499,7 +524,7 @@ int main(int argc, char **argv) {
       if( h > 2 ) {
     #elif (defined b416)
       if( h > 1 ) {
-    #elif (defined b4238) || (defined b4300)
+    #elif (defined b4238) || (defined b4300) || (defined b4333)
     if( h > 0 ) {
     #endif
       Level2.push_back(Quotients[h]);

@@ -114,51 +114,49 @@ public:
   void
   exponentiate_iQ( GaugeLinkField &e_iQ,
 		   const GaugeLinkField &iQ) const {
+       e_iQ = 1.0 ;
+    {
+      autoView( e_iQ_v , e_iQ  , AcceleratorWrite ) ;
+      autoView( iQ_v   , iQ    , AcceleratorRead ) ;
+      accelerator_for(ss,e_iQ_v.size(), GaugeLinkField::vector_object::Nsimd(),{
 #if (Config_Nc == 2)
-    const LatticeComplex z0 = peekColour( iQ , 0 , 0 ) ;
-    const LatticeComplex z1 = peekColour( iQ , 0 , 1 ) ; 
-    const LatticeComplex Z  = sqrt( z0*z0 + z1*adj(z1) ) ;
-    const LatticeComplex f0 = cos( Z ) ;
-    const LatticeComplex f1 = sin( Z )/Z ;
-    e_iQ = 1.0 ;
-    e_iQ = f0 * e_iQ + timesMinusI(f1) * iQ ;
+          auto z0 = peekColour( iQ_v[ss] , 0 , 0 ) ;
+          auto z1 = peekColour( iQ_v[ss] , 0 , 1 ) ;
+          auto Z  = sqrt( z0*z0 + z1*adj(z1) ) ;
+          const auto f0 = cos( Z ) ;
+          const auto f1 = sin( Z )/Z ;
+          e_iQ = f0 * e_iQ + timesMinusI(f1) * iQ_v[ss] ;
 #else
-    const LatticeColourMatrix iQ2 = iQ*iQ ;
-    
-    // sign in c0 from the conventions on the Ta
-    LatticeComplex u = -imag(trace(iQ2*iQ))*0.3333333333333333148 ;
-    LatticeComplex w = -real(trace(iQ2))*0.5;
-    LatticeComplex f0 = 0.3849001794597505244*w ;
-    w = sqrt(w) ;
-    f0 = f0*w ;
-    f0 = acos(u/f0)*0.3333333333333333148;
-    u = w*(0.5773502691896257311)*cos(f0);
-    w = w*sin(f0);
-    
-    LatticeComplex f2 = timesI( func_xi0(w) );
-    LatticeComplex u2 = u * u;
-    LatticeComplex w2 = w * w;
-    // set w to cos(w) as the actual value of w is not used after here
-    w = cos(w);
-    
-    const LatticeComplex emiu = cos(u) - timesI(sin(u));
-    //const LatticeComplex e2iu = adj(emiu)*adj(emiu) ;
-    u *= 2. ;
-    LatticeComplex e2iu = cos(u) + timesI(sin(u));
-    
-    f0 = e2iu * (u2 - w2) + emiu * ((8.0*u2 * w) + (u * (3.0*u2 + w2) * f2));
-    LatticeComplex f1 = e2iu*u - emiu * ((u * w) - (3.0*u2 - w2) * f2);
-    f2 = e2iu - emiu * (w + (1.5*u) * f2);
-    
-    w = 1.0 ; 
-    w = w / (9.0 * u2 - w2);  // reals
-    f0 = f0 * w ;
-    f1 = f1 * w ;
-    f2 = f2 * w ;
-    
-    e_iQ = 1.0 ;
-    e_iQ = f0 * e_iQ + timesMinusI(f1) * iQ - f2 * iQ2;
+          const auto iQ2 = iQ_v[ss]*iQ_v[ss] ;
+          // sign in c0 from the conventions on the Ta                                                              
+          auto u = -imag(trace(iQ2*iQ_v[ss]))*0.3333333333333333148 ;
+          auto w = -real(trace(iQ2))*0.5;
+          auto f0 = 0.3849001794597505244*w ;
+          w = sqrt(w) ;
+          f0 = f0*w ;
+          f0 = acos(u/f0)*0.3333333333333333148;
+          u = w*(0.5773502691896257311)*cos(f0);
+          w = w*sin(f0);
+          auto f2 = timesI( sin(w)/w );
+          auto u2 = u * u;
+          auto w2 = w * w;
+          // set w to cos(w) as the actual value of w is not used after here                                        
+          w = cos(w);
+          const auto emiu = cos(u) - timesI(sin(u));
+	            u = 2.*u ;
+          auto e2iu = cos(u) + timesI(sin(u));
+          f0 = e2iu * (u2 - w2) + emiu * ((8.0*u2 * w) + (u * (3.0*u2 + w2) * f2));
+          auto f1 = e2iu*u - emiu * ((u * w) - (3.0*u2 - w2) * f2);
+          f2 = e2iu - emiu * (w + (1.5*u) * f2);
+          w = 1.0 ;
+          w = w / (9.0 * u2 - w2);  // reals                                                                        
+          f0 = f0 * w ;
+          f1 = f1 * w ;
+          f2 = f2 * w ;
+          e_iQ_v[ss] = f0*e_iQ_v[ss] + timesMinusI(f1)*iQ_v[ss] - f2*iQ2;
 #endif
+        });
+    }
   };
 
   void
