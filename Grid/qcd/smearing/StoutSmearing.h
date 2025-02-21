@@ -72,6 +72,13 @@ public:
     std::cout << GridLogDebug << "Stout smearing constructor : Smear_Stout(const std::vector<double>& " << rho_ << " )" << std::endl;
     assert(Nc<4 && "Stout smearing currently implemented only for Nc== 2 or 3");
     }
+  
+  /*! Default constructor. rho is constant in all directions, optionally except for orthogonal dimension */
+  Smear_Stout(double rho = 1.0, GridBase *grid = NULL , int orthogdim = -1)
+    : OrthogDim{orthogdim}, SmearRho{ rho3D(rho,orthogdim) }, OwnedBase{ new Smear_APE<Gimpl>(rho,grid) }, SmearBase{OwnedBase.get()} {
+    assert(Nc<4 && "Stout smearing currently implemented only for Nc==2 or 3");
+  }
+
 
   /*! Default constructor. rho is constant in all directions, optionally except for orthogonal dimension */
   Smear_Stout(double rho = 1.0, int orthogdim = -1)
