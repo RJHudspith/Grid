@@ -101,101 +101,61 @@ public:
   ///////////////////////////////////////////////////////////////////////////////
   void smear(GaugeField& u_smr, const GaugeField& U)const{
     // faster version but doesn't work with weird boundaries!!! Use at your own risk!!
-    for( int mu = 0 ; mu < Nd ; mu++ ) {
-      *ust[mu] = PeekIndex<LorentzIndex>(U,mu) ;
+    #pragma unroll
+    for (int d = 0; d < Nd; d++) {
+      *ust[d] = PeekIndex<LorentzIndex>(U, d);
     }
-    for(int mu=0; mu<Nd; ++mu){
-      *temp_Sigma = Zero() ;
+    const int mp[4][3] = { {1,2,3} , {0,2,3} , {0,1,3} , {0,1,2} } ;
+    for( int mu = 0 ; mu < Nd ; mu++ ) {
       autoView( umu_v , (*ust[mu]) , AcceleratorRead ) ;
-      #pragma unroll
-      for( int nu = 0;nu < Nd; nu++) {
-	if( nu==mu ) continue ;
-	// first ortho dir
-	Real rhomu = rho[mu+Nd*nu] ;
-	*sh1 = Cshift(*ust[nu],mu,1) ; *sh2 = Cshift(*ust[mu],nu,1) ;
-	autoView( tmp_staple_v  , (*u_tmp1)   , AcceleratorWrite ) ;
-	autoView( tmp_staple2_v , (*u_tmp2)   , AcceleratorWrite ) ;
+      autoView( tmp_staple1_v , (*u_tmp1)  , AcceleratorWrite ) ;
+      autoView( tmp_staple2_v , (*u_tmp2)  , AcceleratorWrite ) ;
+      int nu = mp[mu][0] ;
+      Real rhomu = rho[mu+Nd*nu] ;
+      *sh1 = Cshift(*ust[nu],mu,1) ; *sh2 = Cshift(*ust[mu],nu,1) ;
+      {
 	autoView( tmp_v         , (*sh1)     , AcceleratorRead ) ;
 	autoView( tmp2_v        , (*sh2)     , AcceleratorRead ) ;
 	autoView( unu_v         , (*ust[nu]) , AcceleratorRead ) ;
 	accelerator_for(ss,unu_v.size(), GaugeField::vector_object::Nsimd(),{
-	    tmp_staple_v[ss]  = unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ;
+	    tmp_staple1_v[ss] = unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ;
 	    tmp_staple2_v[ss] = adj(unu_v[ss])*umu_v[ss]*tmp_v[ss] ;
 	  }) ;
-	*u_tmp1 += Cshift(*u_tmp2,nu,-1) ;
-	*temp_Sigma += (*u_tmp1)*rhomu;
-      }    
+      }
+      *u_tmp1 += Cshift(*u_tmp2,nu,-1) ;
+      *temp_Sigma = (*u_tmp1)*rhomu;
+      // second orthodir
+      nu = mp[mu][1] ;
+      rhomu = rho[mu+Nd*nu] ;
+      *sh1 = Cshift(*ust[nu],mu,1) ; *sh2 = Cshift(*ust[mu],nu,1) ;
+      {
+	autoView( tmp_v         , (*sh1)     , AcceleratorRead ) ;
+	autoView( tmp2_v        , (*sh2)     , AcceleratorRead ) ;
+	autoView( unu_v         , (*ust[nu]) , AcceleratorRead ) ;
+	accelerator_for(ss,unu_v.size(), GaugeField::vector_object::Nsimd(),{
+	    tmp_staple1_v[ss] = unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ;
+	    tmp_staple2_v[ss] = adj(unu_v[ss])*umu_v[ss]*tmp_v[ss] ;
+	  }) ;
+      }
+      *u_tmp1 += Cshift(*u_tmp2,nu,-1) ;
+      *temp_Sigma += (*u_tmp1)*rhomu;
+      // third othodir
+      nu = mp[mu][2] ;
+      rhomu = rho[mu+Nd*nu] ;
+      *sh1 = Cshift(*ust[nu],mu,1) ; *sh2 = Cshift(*ust[mu],nu,1) ;
+      {
+	autoView( tmp_v         , (*sh1)     , AcceleratorRead ) ;
+	autoView( tmp2_v        , (*sh2)     , AcceleratorRead ) ;
+	autoView( unu_v         , (*ust[nu]) , AcceleratorRead ) ;
+	accelerator_for(ss,unu_v.size(), GaugeField::vector_object::Nsimd(),{
+	    tmp_staple1_v[ss] = unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ;
+	    tmp_staple2_v[ss] = adj(unu_v[ss])*umu_v[ss]*tmp_v[ss] ;
+	  }) ;
+      }
+      *u_tmp1 += Cshift(*u_tmp2,nu,-1) ;
+      *temp_Sigma += (*u_tmp1)*rhomu;
       pokeLorentz(u_smr, *temp_Sigma, mu); 
     }
-#if 0
-    GridBase *grid = U.Grid();
-    GaugeLinkField Cup(grid), tmp_staple(grid) , tmp_staple2(grid) , tmp( grid ), tmp2( grid ) ;
-    std::vector<GaugeLinkField> u(Nd, grid);
-    for (int d = 0; d < Nd; d++) {
-      u[d] = PeekIndex<LorentzIndex>(U, d);
-    }    
-    const int mp[4][3] = { {1,2,3} , {0,2,3} , {0,1,3} , {0,1,2} } ;
-    for(int mu=0; mu<Nd; ++mu){
-      // first ortho dir
-      int nu = mp[mu][0] ;
-      Real rhomu = rho[mu+Nd*mp[mu][0]] ;
-      tmp = Cshift(u[nu],mu,1) ; tmp2 = Cshift(u[mu],nu,1) ;
-      {
-	autoView( tmp_staple_v  , tmp_staple  , AcceleratorWrite ) ;
-	autoView( tmp_staple2_v , tmp_staple2 , AcceleratorWrite ) ;
-	autoView( tmp_v         , tmp         , AcceleratorRead ) ;
-	autoView( tmp2_v        , tmp2        , AcceleratorRead ) ;
-	autoView( unu_v         , u[nu]       , AcceleratorRead ) ;
-	autoView( umu_v         , u[mu]       , AcceleratorRead ) ;
-	accelerator_for(ss,unu_v.size(), GaugeField::vector_object::Nsimd(),{
-	    tmp_staple_v[ss] = unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ;
-	    tmp_staple2_v[ss] = adj(unu_v[ss])*umu_v[ss]*(tmp_v[ss]) ;
-	  }) ;
-      }
-      tmp_staple += Cshift(tmp_staple2,nu,-1) ;      
-      Cup  = tmp_staple*rhomu;
-
-      // second nu dir
-      nu = mp[mu][1] ;
-      rhomu = rho[mu+Nd*mp[mu][1]] ;
-      tmp = Cshift(u[nu],mu,1) ; tmp2 = Cshift(u[mu],nu,1) ;
-      {
-	autoView( tmp_staple_v  , tmp_staple  , AcceleratorWrite ) ;
-	autoView( tmp_staple2_v , tmp_staple2 , AcceleratorWrite ) ;
-	autoView( tmp_v         , tmp         , AcceleratorRead ) ;
-	autoView( tmp2_v        , tmp2        , AcceleratorRead ) ;
-	autoView( unu_v         , u[nu]       , AcceleratorRead ) ;
-	autoView( umu_v         , u[mu]       , AcceleratorRead ) ;
-	accelerator_for(ss,unu_v.size(), GaugeField::vector_object::Nsimd(),{
-	    tmp_staple_v[ss] = unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ;
-	    tmp_staple2_v[ss] = adj(unu_v[ss])*umu_v[ss]*(tmp_v[ss]) ;
-	  }) ;
-      }
-      tmp_staple += Cshift(tmp_staple2,nu,-1) ;      
-      Cup += tmp_staple*rhomu;
-
-      // final ortho dir
-      nu = mp[mu][2] ;
-      rhomu = rho[mu+Nd*mp[mu][2]] ;
-      tmp = Cshift(u[nu],mu,1) ; tmp2 = Cshift(u[mu],nu,1) ;
-      {
-	autoView( tmp_staple_v  , tmp_staple  , AcceleratorWrite ) ;
-	autoView( tmp_staple2_v , tmp_staple2 , AcceleratorWrite ) ;
-	autoView( tmp_v         , tmp         , AcceleratorRead ) ;
-	autoView( tmp2_v        , tmp2        , AcceleratorRead ) ;
-	autoView( unu_v         , u[nu]       , AcceleratorRead ) ;
-	autoView( umu_v         , u[mu]       , AcceleratorRead ) ;
-	accelerator_for(ss,unu_v.size(), GaugeField::vector_object::Nsimd(),{
-	    tmp_staple_v[ss] = unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ;
-	    tmp_staple2_v[ss] = adj(unu_v[ss])*umu_v[ss]*(tmp_v[ss]) ;
-	  }) ;
-      }
-      tmp_staple += Cshift(tmp_staple2,nu,-1) ;      
-      Cup  += tmp_staple*rhomu;
-    
-      pokeLorentz(u_smr, Cup, mu); 
-    }
-#endif
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -203,7 +163,7 @@ public:
 		  const GaugeField& iLambda,
 		  const GaugeField& U)const{
     Real rho_munu = 0. , rho_numu = 0. ;
-#pragma unroll
+    #pragma unroll
     for (int d = 0; d < Nd; d++) {
       *ust[d] = PeekIndex<LorentzIndex>(U, d);
       *lst[d] = PeekIndex<LorentzIndex>(iLambda, d);

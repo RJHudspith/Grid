@@ -11,15 +11,15 @@
 NAMESPACE_BEGIN(Grid);
 
 //#define b4008
-#define b4068
+//#define b4068
 //#define b416
 //#define b4238
 //#define b4300
-//#define b4333
+#define b4333
 
-//#define L48
+#define L48
 //#define L32
-#define L24
+//#define L24
 //#define L20
 //#define L16
 
@@ -291,15 +291,18 @@ int main(int argc, char **argv) {
 #elif (defined b4333)
   const int Ls            = 4;
   const Real beta         = 4.333;
-  const Real strange_mass = 0.021;
+  const Real strange_mass = 0.022;
   const Real charm_mass   = 11.8*strange_mass ;
   const Real pv_mass      = 1.0;
   const RealD M5          = 1.0;
-  const RealD b           = 1.15;
-  const RealD c           = 0.15;
-  #ifdef L32
-    const Real light_mass   = 0.009;
-    std::vector<Real> hasenbusch( { 0.03, 0.12, 0.35 } ) ;  
+  const RealD b           = 1.16;
+  const RealD c           = 0.16;
+#ifdef L48
+    const Real light_mass   = 0.004;
+    std::vector<Real> hasenbusch( { 0.015, 0.06, 0.14, 0.35 , 0.62 } ) ;  
+#elif (defined L32)
+    const Real light_mass   = 0.0085;
+    std::vector<Real> hasenbusch( { 0.03, 0.12, 0.42 } ) ;  
   #else
     #error "L not supported"
   #endif
@@ -433,8 +436,10 @@ int main(int argc, char **argv) {
     #else
     Level1.push_back( EOFA[i] );
     #endif
-#elif (defined b4238) || (defined b4300) || (defined b4333)
+#elif (defined b4238) || (defined b4300)
     Level1.push_back( EOFA[i] );
+#elif (defined b4333)
+    Level2.push_back( EOFA[i] );
 #endif
   }
 
@@ -453,9 +458,12 @@ int main(int argc, char **argv) {
   }
   // and then 
   light_num.push_back(pv_mass);
-  
-  // extra 2f charm here
+
   light_den.push_back( charm_mass ) ;
+#ifdef b4333
+  light_num.push_back(0.58);
+  light_den.push_back(0.58);
+#endif
   light_num.push_back( pv_mass ) ;
 
   //////////////////////////////////////////////////////////////
@@ -473,8 +481,11 @@ int main(int argc, char **argv) {
   std::vector<LinearOperatorD *> LinOpD;
   std::vector<LinearOperatorF *> LinOpF; 
 
+#ifdef b4333
+  for(int h=0;h<n_hasenbusch+3;h++){
+#else
   for(int h=0;h<n_hasenbusch+2;h++){
-
+#endif
     std::cout << GridLogMessage << " 2f quotient Action  "<< light_num[h] << " / " << light_den[h]<< std::endl;
 
     Numerators.push_back  (new FermionAction(U,*FGrid,*FrbGrid,*GridPtr,*GridRBPtr,light_num[h],M5,b,c, Params));
@@ -553,7 +564,7 @@ int main(int argc, char **argv) {
   //SmearingParameters SmPar(Reader);
   double rho = 0.125;  // smearing parameter
   int Nsmear = 8;    // number of smearing levels
-  Smear_Stout<HMCWrapper::ImplPolicy> Stout(rho);
+  Smear_Stout<HMCWrapper::ImplPolicy> Stout(rho,GridPtr);
   SmearedConfiguration<HMCWrapper::ImplPolicy> SmearingPolicy(GridPtr, Nsmear, Stout);
 
   std::cout << GridLogMessage << " Running the HMC "<< std::endl;
