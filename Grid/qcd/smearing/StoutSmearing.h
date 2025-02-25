@@ -73,43 +73,36 @@ public:
     assert(Nc<4 && "Stout smearing currently implemented only for Nc== 2 or 3");
     }
   
-  /*! Default constructor. rho is constant in all directions, optionally except for orthogonal dimension */
+  // Default constructor. rho is constant in all directions, optionally except for orthogonal dimension
+  // Will die if grid is actually passed as NULL in APE smearing routines
   Smear_Stout(double rho = 1.0, GridBase *grid = NULL , int orthogdim = -1)
-    : OrthogDim{orthogdim}, SmearRho{ rho3D(rho,orthogdim) }, OwnedBase{ new Smear_APE<Gimpl>(rho,grid) }, SmearBase{OwnedBase.get()} {
-    assert(Nc<4 && "Stout smearing currently implemented only for Nc==2 or 3");
-  }
-
-
-  /*! Default constructor. rho is constant in all directions, optionally except for orthogonal dimension */
-  Smear_Stout(double rho = 1.0, int orthogdim = -1)
-  : OrthogDim{orthogdim}, SmearRho{ rho3D(rho,orthogdim) }, OwnedBase{ new Smear_APE<Gimpl>(SmearRho) }, SmearBase{OwnedBase.get()} {
+    : OrthogDim{orthogdim},
+      SmearRho{ rho3D(rho,orthogdim) },
+      OwnedBase{ new Smear_APE<Gimpl>(rho,grid) },
+      SmearBase{OwnedBase.get()} {
     assert(Nc<4 && "Stout smearing currently implemented only for Nc==2 or 3");
   }
 
   ~Smear_Stout() {}  // delete SmearBase...
 
   void smear(GaugeField& u_smr, const GaugeField& U) const {
-    GaugeField C(U.Grid());
     GaugeLinkField tmp(U.Grid()), Umu(U.Grid());
-
     std::cout << GridLogDebug << "Stout smearing started\n";
-
-    // C contains the staples multiplied by some rho
-    u_smr = U ; // set the smeared field to the current gauge field
-    SmearBase->smear(C, U);
-
+    SmearBase->smear(u_smr, U);
+    #pragma unroll
     for (int mu = 0; mu < Nd; mu++) {
       if( mu == OrthogDim ) continue ;
       // u_smr = exp(iQ_mu)*U_mu apart from Orthogdim
       Umu = peekLorentz(U, mu);
-      tmp = peekLorentz(C, mu);
+      tmp = peekLorentz(u_smr, mu);
       exponentiate_iQ(tmp, Ta( tmp * adj(Umu)) );
       pokeLorentz(u_smr, tmp * Umu, mu);
     }
     std::cout << GridLogDebug << "Stout smearing completed\n";
   };
 
-  void derivative(GaugeField& SigmaTerm, const GaugeField& iLambda,
+  void derivative(GaugeField& SigmaTerm,
+		  const GaugeField& iLambda,
                   const GaugeField& Gauge) const {
     SmearBase->derivative(SigmaTerm, iLambda, Gauge);
   };
@@ -132,7 +125,7 @@ public:
           auto Z  = sqrt( z0*z0 + z1*adj(z1) ) ;
           const auto f0 = cos( Z ) ;
           const auto f1 = sin( Z )/Z ;
-          e_iQ = f0 * e_iQ + timesMinusI(f1) * iQ_v[ss] ;
+          e_iQ = f0*e_iQ + timesMinusI(f1)*iQ_v[ss] ;
 #else
           const auto iQ2 = iQ_v[ss]*iQ_v[ss] ;
           // sign in c0 from the conventions on the Ta                                                              
@@ -150,7 +143,7 @@ public:
           // set w to cos(w) as the actual value of w is not used after here                                        
           w = cos(w);
           const auto emiu = cos(u) - timesI(sin(u));
-	            u = 2.*u ;
+	  u = 2.*u ;
           auto e2iu = cos(u) + timesI(sin(u));
           f0 = e2iu * (u2 - w2) + emiu * ((8.0*u2 * w) + (u * (3.0*u2 + w2) * f2));
           auto f1 = e2iu*u - emiu * ((u * w) - (3.0*u2 - w2) * f2);
@@ -165,58 +158,6 @@ public:
         });
     }
   };
-
-  void
-  set_uw( LatticeComplex& u,
-	  LatticeComplex& w,
-	  const GaugeLinkField& iQ2,
-	  const GaugeLinkField& iQ3) const {
-    // sign in c0 from the conventions on the Ta
-    u = -imag(trace(iQ3))*0.3333333333333333148 ;
-    w = -real(trace(iQ2))*0.5;
-    LatticeComplex c0max = 0.3849001794597505244*w ;
-    w = sqrt(w) ;
-    c0max = c0max*w ;
-    c0max = acos(u/c0max)*0.3333333333333333148;
-    u = w*(0.5773502691896257311)*cos(c0max);
-    w = w*sin(c0max);
-  }
-
-  void
-  set_fj( LatticeComplex& f0,
-	  LatticeComplex& f1,
-	  LatticeComplex& f2,
-	  const LatticeComplex& u,
-	  const LatticeComplex& w) const {
-    const LatticeComplex u2 = u * u;
-    const LatticeComplex w2 = w * w;
-    const LatticeComplex cosw = cos(w);
-    const LatticeComplex emiu = cos(u) - timesI(sin(u));
-    //const LatticeComplex e2iu = adj(emiu)*adj(emiu) ;
-    const LatticeComplex e2iu = cos(2.*u) + timesI(sin(2.*u)) ;
-    LatticeComplex ixi0 = timesI( func_xi0(w) );  
-    f0 = e2iu * (u2 - w2) + emiu * ((8.0 * u2 * cosw) + (2.*u*(3.0 * u2 + w2) * ixi0));
-    f1 = e2iu * (2.0 * u) - emiu * ((2.0 * u * cosw) - (3.0 * u2 - w2) * ixi0);
-    f2 = e2iu - emiu * (cosw + (3.0 * u) * ixi0);
-    ixi0 = 1.0 ; 
-    ixi0 = ixi0 / (9.0 * u2 - w2);
-    f0 = f0 * ixi0 ;
-    f1 = f1 * ixi0 ;
-    f2 = f2 * ixi0 ;
-  }
-
-  LatticeComplex func_xi0(const LatticeComplex& w) const {
-    // Definition from arxiv 0311018
-    //if (abs(w) < 0.05) {w2 = w*w; return 1.0 - w2/6.0 * (1.0-w2/20.0 * (1.0-w2/42.0));}
-    return sin(w) / w;
-  }
-
-  LatticeComplex func_xi1(const LatticeComplex& w) const {
-    // Define a function to do the check
-    // if( w < 1e-4 ) std::cout << GridLogWarning << "[Smear_stout] w too small:
-    // "<< w <<"\n";
-    return cos(w) / (w * w) - sin(w) / (w * w * w);
-  }
 };
 
 NAMESPACE_END(Grid);
