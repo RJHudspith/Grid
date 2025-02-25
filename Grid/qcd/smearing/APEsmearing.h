@@ -102,6 +102,7 @@ public:
   ///////////////////////////////////////////////////////////////////////////////
   void smear(GaugeField& u_smr, const GaugeField& U)const{
     // faster version but doesn't work with weird boundaries!!! Use at your own risk!!
+    assert( Nd==4 ) ;
     #pragma unroll
     for (int d = 0; d < Nd; d++) {
       *ust[d] = PeekIndex<LorentzIndex>(U, d);
@@ -125,7 +126,7 @@ public:
       }
       *u_tmp1 += Cshift(*u_tmp2,nu,-1) ;
       *temp_Sigma = (*u_tmp1)*rhomu;
-      // second orthodir                                                                                               
+      // second orthodir                                                                                            
       nu = mp[mu][1] ;
       rhomu = rho[mu+Nd*nu] ;
       *sh1 = Cshift(*ust[nu],mu,1) ; *sh2 = Cshift(*ust[mu],nu,1) ;
@@ -140,7 +141,7 @@ public:
       }
       *u_tmp1 += Cshift(*u_tmp2,nu,-1) ;
       *temp_Sigma += (*u_tmp1)*rhomu;
-      // third othodir                                                                                                 
+      // third othodir                                                                                              
       nu = mp[mu][2] ;
       rhomu = rho[mu+Nd*nu] ;
       *sh1 = Cshift(*ust[nu],mu,1) ; *sh2 = Cshift(*ust[mu],nu,1) ;
@@ -164,7 +165,7 @@ public:
 		  const GaugeField& iLambda,
 		  const GaugeField& U)const{
     Real rho_munu = 0. , rho_numu = 0. ;
-#pragma unroll
+    #pragma unroll
     for (int d = 0; d < Nd; d++) {
       *ust[d] = PeekIndex<LorentzIndex>(U, d);
       *lst[d] = PeekIndex<LorentzIndex>(iLambda, d);
@@ -177,10 +178,10 @@ public:
         if(nu==mu) continue;
         rho_munu = rho[mu + Nd * nu];
         rho_numu = rho[nu + Nd * mu];
-        *u_tmp1 = Cshift(*ust[nu] , mu , 1 ) ;
-        *u_tmp2 = Cshift(*ust[mu] , nu , 1 ) ;
-        *sh1    = Cshift(*lst[nu] , mu , 1 ) ;
-        *sh2    = Cshift(*lst[mu] , nu , 1 ) ;
+        *u_tmp1  = Cshift(*ust[nu] , mu , 1 ) ;
+        *u_tmp2  = Cshift(*ust[mu] , nu , 1 ) ;
+        *sh1     = Cshift(*lst[nu] , mu , 1 ) ;
+        *sh2     = Cshift(*lst[mu] , nu , 1 ) ;
         autoView( temp_Sigma_v , (*temp_Sigma) , AcceleratorWrite ) ;
         autoView( u_tmp1_v     , (*u_tmp1)     , AcceleratorWrite ) ;
         autoView( sh1_v        , (*sh1)        , AcceleratorRead ) ;

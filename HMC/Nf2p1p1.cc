@@ -11,15 +11,15 @@
 NAMESPACE_BEGIN(Grid);
 
 //#define b4008
-#define b4068
+//#define b4068
 //#define b416
 //#define b4238
 //#define b4300
-//#define b4333
+#define b4333
 
-//#define L48
+#define L48
 //#define L32
-#define L24
+//#define L24
 //#define L20
 //#define L16
 
@@ -189,21 +189,22 @@ int main(int argc, char **argv) {
   const int Ls            = 10;
   const Real beta         = 4.008;
   const Real strange_mass = 0.0725;
-  const Real charm_mass   = 11.8*strange_mass ;
-  const Real pv_mass      = 1.0;
-  const RealD M5          = 1.0;
   const RealD b           = 1.75; 
   const RealD c           = 0.75;
   #ifdef L32
+    const int Nlvl1 = 3 ; // how many of the Hasenbusch terms are on coarsest integrator level
     const Real light_mass   = 0.004;
     std::vector<Real> hasenbusch( { 0.0075, 0.0125, 0.0225, 0.0475, 0.09, 0.18, 0.36, 0.64 } ) ;
   #elif (defined L24)
+    const int Nlvl1 = 2 ;
     const Real light_mass   = 0.009;
     std::vector<Real> hasenbusch( { 0.016, 0.028, 0.045, 0.09, 0.18, 0.4, 0.64 } ) ;
   #elif (defined L20)
+    const int Nlvl1 = 2 ;
     const Real light_mass   = 0.012;
-    std::vector<Real> hasenbusch( { 0.035, 0.09, 0.15, 0.3, 0.5 } ) ;    
+    std::vector<Real> hasenbusch( { 0.02, 0.045, 0.08, 0.16, 0.4, 0.64 } ) ;    
   #elif (defined L16)
+    const int Nlvl1 = 1 ;
     const Real light_mass   = 0.019;
     std::vector<Real> hasenbusch( { 0.038, 0.09, 0.15, 0.3, 0.5 } ) ;
   #else
@@ -213,21 +214,22 @@ int main(int argc, char **argv) {
   const int Ls            = 8;
   const Real beta         = 4.068;
   const Real strange_mass = 0.056;
-  const Real charm_mass   = 11.8*strange_mass ;
-  const Real pv_mass      = 1.0;
-  const RealD M5          = 1.0;
   const RealD b           = 1.5; 
   const RealD c           = 0.5;
   #ifdef L32
+    const int Nlvl1 = 2 ;
     const Real light_mass   = 0.005 ;
     std::vector<Real> hasenbusch( { 0.013, 0.03, 0.06, 0.17, 0.33, 0.63 } ) ;
   #elif (defined L24)
+    const int Nlvl1 = 2 ;
     const Real light_mass   = 0.010 ;
     std::vector<Real> hasenbusch( { 0.017, 0.035, 0.07, 0.17, 0.33, 0.63 } ) ;
   #elif (defined L20)
+    const int Nlvl1 = 2 ;
     const Real light_mass   = 0.013 ;
     std::vector<Real> hasenbusch( { 0.035, 0.07, 0.17, 0.33, 0.61 } ) ;
   #elif (defined L16)
+    const int Nlvl1 = 2 ;
     const Real light_mass   = 0.022 ;
     std::vector<Real> hasenbusch( { 0.04, 0.07, 0.17, 0.33, 0.61 } ) ;  
   #else
@@ -237,34 +239,36 @@ int main(int argc, char **argv) {
 #elif (defined b416)
   const int Ls            = 6;
   const Real beta         = 4.160;
-  const Real strange_mass = 0.042;
-  const Real charm_mass   = 11.8*strange_mass ;
-  const Real pv_mass      = 1.0;
-  const RealD M5          = 1.0;
-  const RealD b           = 1.5;
-  const RealD c           = 0.5;
+  const Real strange_mass = 0.0425;
+  const RealD b           = 1.35;
+  const RealD c           = 0.35;
   #ifdef L32
+    const int Nlvl1 = 1 ;
     const Real light_mass   = 0.006;
     std::vector<Real> hasenbusch( { 0.02, 0.05, 0.15, 0.5 } ) ;
   #elif (defined L24)
+    const int Nlvl1 = 1 ;
     const Real light_mass   = 0.012;
     std::vector<Real> hasenbusch( { 0.05, 0.15, 0.5 } ) ;
+  #elif (defined L20)
+    const int Nlvl1 = 0 ;
+    const Real light_mass   = 0.016;
+    std::vector<Real> hasenbusch( { 0.06, 0.15, 0.5 } ) ;
   #else
     #error "Chosen L not supported"
   #endif
 #elif (defined b4238)
   const int Ls            = 4;
   const Real beta         = 4.238;
-  const Real strange_mass = 0.0295;
-  const Real charm_mass   = 11.8*strange_mass ;
-  const Real pv_mass      = 1.0;
-  const RealD M5          = 1.0;
+  const Real strange_mass = 0.0305;
   const RealD b           = 1.2;
   const RealD c           = 0.2;
   #ifdef L32
+    const int Nlvl1 = 0 ; // only the light quark mass is on level1
     const Real light_mass   = 0.008;
     std::vector<Real> hasenbusch( { 0.035, 0.14, 0.4 } ) ;  
   #elif (defined L24)
+    const int Nlvl1 = 0 ;
     const Real light_mass   = 0.012;
     std::vector<Real> hasenbusch( { 0.055, 0.14, 0.4 } ) ;  
   #else
@@ -274,39 +278,44 @@ int main(int argc, char **argv) {
   const int Ls            = 4;
   const Real beta         = 4.3;
   const Real strange_mass = 0.0245;
-  const Real charm_mass   = 11.8*strange_mass ;
-  const Real pv_mass      = 1.0;
-  const RealD M5          = 1.0;
   const RealD b           = 1.175;
   const RealD c           = 0.175;
   #ifdef L48
-  const Real light_mass   = 0.0035;
-  std::vector<Real> hasenbusch( { 0.008, 0.12, 0.35 } ) ;  
+    const int Nlvl1 = 0 ; // only light quark mass on level1?
+    const Real light_mass   = 0.0035;
+    std::vector<Real> hasenbusch( { 0.008, 0.12, 0.35 } ) ;  
   #elif (defined L32)
-  const Real light_mass   = 0.008;
-  std::vector<Real> hasenbusch( { 0.03, 0.12, 0.35 } ) ;  
+    const int Nlvl1 = 0 ;
+    const Real light_mass   = 0.008;
+    std::vector<Real> hasenbusch( { 0.03, 0.12, 0.35 } ) ;  
   #else
     #error "L not supported"
   #endif
 #elif (defined b4333)
   const int Ls            = 4;
   const Real beta         = 4.333;
-  const Real strange_mass = 0.021;
-  const Real charm_mass   = 11.8*strange_mass ;
-  const Real pv_mass      = 1.0;
-  const RealD M5          = 1.0;
-  const RealD b           = 1.15;
-  const RealD c           = 0.15;
-  #ifdef L32
-    const Real light_mass   = 0.009;
-    std::vector<Real> hasenbusch( { 0.03, 0.12, 0.35 } ) ;  
+  const Real strange_mass = 0.0202;
+  const RealD b           = 1.16;
+  const RealD c           = 0.16;
+#ifdef L48
+    const int Nlvl1 = 0 ;
+    const Real light_mass   = 0.003;
+    std::vector<Real> hasenbusch( { 0.015, 0.07, 0.15, 0.3 , 0.58 } ) ;  
+#elif (defined L32)
+    const int Nlvl1 = 1 ; // puts 0.015 on level 1
+    const Real light_mass   = 0.0073;
+    std::vector<Real> hasenbusch( { 0.015, 0.07, 0.2, 0.55 } ) ;  
   #else
     #error "L not supported"
   #endif
 #else
   exit(1) ;
 #endif
-  std::cout<<"aml,ams,amx = " << light_mass << " , " << strange_mass << " , " << charm_mass << std::endl ;
+  // these are universal
+  const RealD M5         = 1.0;
+  const Real pv_mass     = 1.0;
+  const Real charm_mass  = 11.8*strange_mass ;
+  std::cout<<"aml,ams,amc = " << light_mass << " , " << strange_mass << " , " << charm_mass << std::endl ;
   
   auto GridPtr   = TheHMC.Resources.GetCartesian();
   auto GridRBPtr = TheHMC.Resources.GetRBCartesian();
@@ -379,7 +388,7 @@ int main(int argc, char **argv) {
 
   // could put an intermediate hasenbusch here I suppose ....
 #if (defined b4008)
-#if (defined L32) || (defined L16) || (defined L20)
+  #if (defined L32) || (defined L16) || (defined L20)
     std::vector<double> EOFAhs = { strange_mass , 0.18 , charm_mass } ;
   #elif (defined L24)
     std::vector<double> EOFAhs = { strange_mass , 0.2 , charm_mass } ;
@@ -418,7 +427,7 @@ int main(int argc, char **argv) {
     EOFA.push_back( new ExactOneFlavourRatioPseudoFermionAction<FermionImplPolicy>( *Strange_Op_L[i], *Strange_Op_R[i], ActionCG, *ActionCGL[i], *ActionCGR[i], *DerivativeCGL[i], *DerivativeCGR[i], OFRp, true ) );
     EOFA[i] -> is_smeared = true ;
 
-    // put them all on Level1 because the EOFA is pretty well behaved
+    // try to put EOFA on level1 but sometimes have to put it on level2
 #ifdef b4008
     if( i > 0 ) {
       Level2.push_back( EOFA[i] );
@@ -433,8 +442,10 @@ int main(int argc, char **argv) {
     #else
     Level1.push_back( EOFA[i] );
     #endif
-#elif (defined b4238) || (defined b4300) || (defined b4333)
+#elif (defined b4238) || (defined b4300)
     Level1.push_back( EOFA[i] );
+#elif (defined b4333)
+    Level2.push_back( EOFA[i] );
 #endif
   }
 
@@ -443,8 +454,7 @@ int main(int argc, char **argv) {
   ////////////////////////////////////
   std::vector<Real> light_den , light_num;
 
-  // charm as 2 flavor so we can EOFA the strange .... (c/s)(PV/c)^2 -> s/PV,c/PV and then the usual chain?
-
+  // charm as 2 flavor so we can EOFA the strange .... (c/s)(PV/c)^2 -> s/PV,c/PV and then the usual chain
   int n_hasenbusch = hasenbusch.size();
   light_den.push_back(light_mass);
   for(int h=0;h<n_hasenbusch;h++){
@@ -453,9 +463,12 @@ int main(int argc, char **argv) {
   }
   // and then 
   light_num.push_back(pv_mass);
-  
-  // extra 2f charm here
+
   light_den.push_back( charm_mass ) ;
+#ifdef b4333
+  light_num.push_back(0.55);
+  light_den.push_back(0.55);
+#endif
   light_num.push_back( pv_mass ) ;
 
   //////////////////////////////////////////////////////////////
@@ -473,8 +486,12 @@ int main(int argc, char **argv) {
   std::vector<LinearOperatorD *> LinOpD;
   std::vector<LinearOperatorF *> LinOpF; 
 
+  // extra step for very fine ensemble
+#ifdef b4333
+  for(int h=0;h<n_hasenbusch+3;h++){
+#else
   for(int h=0;h<n_hasenbusch+2;h++){
-
+#endif
     std::cout << GridLogMessage << " 2f quotient Action  "<< light_num[h] << " / " << light_den[h]<< std::endl;
 
     Numerators.push_back  (new FermionAction(U,*FGrid,*FrbGrid,*GridPtr,*GridRBPtr,light_num[h],M5,b,c, Params));
@@ -511,22 +528,8 @@ int main(int argc, char **argv) {
     Quotients.push_back (new TwoFlavourEvenOddRatioPseudoFermionAction<FermionImplPolicy>(*Numerators[h],*Denominators[h],*MPCG[h],*ActionMPCG[h],ActionCG));
     Quotients[h] -> is_smeared = true ;
 
-    // put everything apart from the light quark on level 2
-    #ifdef b4008
-      #ifdef L32
-        if( h > 3 ) {
-      #elif (defined L24)
-        if( h > 2 ) {
-      #elif (defined L16) || (defined L20)
-        if( h > 1 ) {
-      #endif
-    #elif (defined b4068)
-      if( h > 2 ) {
-    #elif (defined b416)
-      if( h > 1 ) {
-    #elif (defined b4238) || (defined b4300) || (defined b4333)
-    if( h > 0 ) {
-    #endif
+    // put everything apart from the light quark and some hasenbusches on level 2
+    if( h > Nlvl1 ) {
       Level2.push_back(Quotients[h]);
     } else {
       Level1.push_back(Quotients[h]);
@@ -553,7 +556,7 @@ int main(int argc, char **argv) {
   //SmearingParameters SmPar(Reader);
   double rho = 0.125;  // smearing parameter
   int Nsmear = 8;    // number of smearing levels
-  Smear_Stout<HMCWrapper::ImplPolicy> Stout(rho);
+  Smear_Stout<HMCWrapper::ImplPolicy> Stout(rho,GridPtr);
   SmearedConfiguration<HMCWrapper::ImplPolicy> SmearingPolicy(GridPtr, Nsmear, Stout);
 
   std::cout << GridLogMessage << " Running the HMC "<< std::endl;
