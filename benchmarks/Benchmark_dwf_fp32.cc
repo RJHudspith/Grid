@@ -52,7 +52,7 @@ int main (int argc, char ** argv)
 
   int threads = GridThread::GetThreads();
 
-  int Ls=8;
+  int Ls=16;
   for(int i=0;i<argc;i++) {
     if(std::string(argv[i]) == "-Ls"){
       std::stringstream ss(argv[i+1]); ss >> Ls;

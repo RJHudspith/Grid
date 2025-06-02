@@ -33,6 +33,8 @@ Author: Peter Boyle <paboyle@ph.ed.ac.uk>
 ///////////////////////////////////
 #include <Grid/communicator/SharedMemory.h>
 
+#define NVLINK_GET
+
 NAMESPACE_BEGIN(Grid);
 
 extern bool Stencil_force_mpi ;
@@ -147,7 +149,8 @@ public:
 			    sizeof(obj),d*100+p);
 
       }
-      CommsComplete(list);
+      if (!list.empty()) // avoid triggering assert in comms == none
+	CommsComplete(list);
       for(int p=1;p<_processors[d];p++){
 	accum = accum + column[p];
       }
@@ -192,6 +195,11 @@ public:
 				      void *recv,
 				      int recv_from_rank,int do_recv,
 				      int xbytes,int rbytes,int dir);
+
+  // Could do a PollHtoD and have a CommsMerge dependence
+  void StencilSendToRecvFromPollDtoH (std::vector<CommsRequest_t> &list);
+  void StencilSendToRecvFromPollIRecv(std::vector<CommsRequest_t> &list);
+
   double StencilSendToRecvFromBegin(std::vector<CommsRequest_t> &list,
 				    void *xmit,
 				    int xmit_to_rank,int do_xmit,

@@ -443,15 +443,64 @@ static void
 smear_nuunroll( LatticeGaugeField &u_smr , const LatticeGaugeField &U )
 {
   GridBase *grid = U.Grid();
-  LatticeColourMatrix Cup(grid), tmp_staple(grid) , tmp_staple2( grid ) , tmp( grid ) , tmp2( grid ) ; 
+  LatticeColourMatrix tmp_staple(grid) ;
+  LatticeColourMatrix tmp_staple21(grid) , tmp_staple22( grid ) ,  tmp_staple23( grid ) ;
+  LatticeColourMatrix tmp11( grid ) , tmp21( grid ) ;
+  LatticeColourMatrix tmp12( grid ) , tmp22( grid ) ;
+  LatticeColourMatrix tmp13( grid ) , tmp23( grid ) ; 
   std::vector<LatticeColourMatrix> u(Nd, grid);
   for (int d = 0; d < Nd; d++) {
     u[d] = PeekIndex<LorentzIndex>(U, d);
   }
 
+  autoView( tmp_staple_v   , tmp_staple   , AcceleratorWrite ) ;
+  autoView( tmp_staple21_v , tmp_staple21 , AcceleratorWrite ) ;
+  autoView( tmp_staple22_v , tmp_staple22 , AcceleratorWrite ) ;
+  autoView( tmp_staple23_v , tmp_staple23 , AcceleratorWrite ) ;
+
   const int mp[4][3] = { {1,2,3} , {0,2,3} , {0,1,3} , {0,1,2} } ;
   for(int mu=0; mu<Nd; ++mu){
+    
+    autoView( umu_v          , u[mu]        , AcceleratorRead ) ;
 
+    tmp11 = Cshift( u[mp[mu][0]], mu , 1 ) ;
+    tmp21 = Cshift( u[mu], mp[mu][0] , 1 ) ;
+
+    autoView( tmp11_v       , tmp11        , AcceleratorRead ) ;
+    autoView( tmp21_v       , tmp21        , AcceleratorRead ) ;
+    autoView( unu1_v        , u[mp[mu][0]] , AcceleratorRead ) ;
+
+    tmp12 = Cshift( u[mp[mu][1]], mu , 1 ) ;
+    tmp22 = Cshift( u[mu], mp[mu][1] , 1 ) ;
+
+    autoView( tmp12_v       , tmp12    , AcceleratorRead ) ;
+    autoView( tmp22_v       , tmp22    , AcceleratorRead ) ;
+    autoView( unu2_v        , u[mp[mu][1]]    , AcceleratorRead ) ;
+
+    tmp13 = Cshift( u[mp[mu][2]], mu , 1 ) ;
+    tmp23 = Cshift( u[mu], mp[mu][2] , 1 ) ;
+
+    autoView( tmp13_v       , tmp13    , AcceleratorRead ) ;
+    autoView( tmp23_v       , tmp23    , AcceleratorRead ) ;
+    autoView( unu3_v        , u[mp[mu][2]]    , AcceleratorRead ) ;
+    
+    accelerator_for(ss,unu1_v.size(), LatticeColourMatrix::vector_object::Nsimd(),{
+	tmp_staple_v[ss]   = unu1_v[ss]*tmp21_v[ss]*adj(tmp11_v[ss]) ;
+	tmp_staple21_v[ss] = adj(unu1_v[ss])*umu_v[ss]*(tmp11_v[ss]) ;
+	
+	tmp_staple_v[ss]  += unu2_v[ss]*tmp22_v[ss]*adj(tmp12_v[ss]) ;
+	tmp_staple22_v[ss] = adj(unu2_v[ss])*umu_v[ss]*(tmp12_v[ss]) ;
+	
+	tmp_staple_v[ss]  += unu3_v[ss]*tmp23_v[ss]*adj(tmp13_v[ss]) ;
+	tmp_staple23_v[ss] = adj(unu3_v[ss])*umu_v[ss]*(tmp13_v[ss]) ;
+      }) ;
+    tmp_staple += Cshift(tmp_staple21,mp[mu][0],-1) ;      
+    tmp_staple += Cshift(tmp_staple22,mp[mu][1],-1) ;      
+    tmp_staple += Cshift(tmp_staple23,mp[mu][2],-1) ;      
+    
+    pokeLorentz(u_smr, 0.1*tmp_staple, mu); 
+    
+    #if 0
     int nu = mp[mu][0] ;
     tmp = Cshift(u[nu],mu,1) ; tmp2 = Cshift(u[mu],nu,1) ;
     {
@@ -505,7 +554,65 @@ smear_nuunroll( LatticeGaugeField &u_smr , const LatticeGaugeField &U )
     tmp_staple += Cshift(tmp_staple2,nu,-1) ;      
     Cup  += tmp_staple*0.1;
     
-    pokeLorentz(u_smr, (Cup), mu); 
+    pokeLorentz(u_smr, (Cup), mu);
+    #endif
+  }
+}
+
+static void
+smear_nuunrollv2( LatticeGaugeField &u_smr , const LatticeGaugeField &U )
+{
+  GridBase *grid = U.Grid();
+  LatticeColourMatrix tmp_staple1(grid) , tmp_staple21( grid ) ;
+  LatticeColourMatrix tmp_staple22( grid ) , tmp_staple23( grid ) ;
+  std::vector<LatticeColourMatrix> u(Nd*Nd, grid);
+  for (int d = 0; d < Nd; d++) {
+    u[d+Nd*d] = PeekIndex<LorentzIndex>(U, d);
+    for( int nu = 0 ; nu < Nd ; nu++ ) {
+      if( nu != d ) {
+	u[nu+d*Nd] = Cshift( u[d+Nd*d] , nu , 1 ) ;
+      }
+    }
+  }
+  
+  const int mp[4][3] = { {1,2,3} , {0,2,3} , {0,1,3} , {0,1,2} } ;
+  for(int mu=0; mu<Nd; ++mu){
+
+    autoView( tmp_staple1_v  , tmp_staple1  , AcceleratorWrite ) ;
+    autoView( tmp_staple21_v , tmp_staple21 , AcceleratorWrite ) ;
+    autoView( tmp_staple22_v , tmp_staple22 , AcceleratorWrite ) ;
+    autoView( tmp_staple23_v , tmp_staple23 , AcceleratorWrite ) ;
+
+    autoView( umu_v   , u[mu+Nd*mu]               , AcceleratorRead ) ;
+    
+    autoView( tmp11_v , u[mu+Nd*mp[mu][0]]        , AcceleratorRead ) ;
+    autoView( tmp21_v , u[mp[mu][0]+Nd*mu]        , AcceleratorRead ) ;
+    autoView( unu1_v  , u[mp[mu][0]+Nd*mp[mu][0]] , AcceleratorRead ) ;
+    
+    autoView( tmp12_v , u[mu+Nd*mp[mu][1] ]       , AcceleratorRead ) ;
+    autoView( tmp22_v , u[mp[mu][1]+Nd*mu]        , AcceleratorRead ) ;
+    autoView( unu2_v  , u[mp[mu][1]+Nd*mp[mu][1]] , AcceleratorRead ) ;
+    
+    autoView( tmp13_v , u[mu+Nd*mp[mu][2]]        , AcceleratorRead ) ;
+    autoView( tmp23_v , u[mp[mu][2]+Nd*mu]        , AcceleratorRead ) ;
+    autoView( unu3_v  , u[mp[mu][2]+Nd*mp[mu][2]] , AcceleratorRead ) ;
+    
+    accelerator_for(ss,unu1_v.size(), LatticeColourMatrix::vector_object::Nsimd(),{
+	tmp_staple1_v[ss]  = unu1_v[ss]*tmp21_v[ss]*adj(tmp11_v[ss]) ;
+	tmp_staple21_v[ss] = adj(unu1_v[ss])*umu_v[ss]*(tmp11_v[ss]) ;
+	
+	tmp_staple1_v[ss] += unu2_v[ss]*tmp22_v[ss]*adj(tmp12_v[ss]) ;
+	tmp_staple22_v[ss] = adj(unu2_v[ss])*umu_v[ss]*(tmp12_v[ss]) ;
+	
+	tmp_staple1_v[ss] += unu3_v[ss]*tmp23_v[ss]*adj(tmp13_v[ss]) ;
+	tmp_staple23_v[ss] = adj(unu3_v[ss])*umu_v[ss]*(tmp13_v[ss]) ;
+      }) ;
+    // cshift downward cups
+    tmp_staple1 += Cshift(tmp_staple21,mp[mu][0],-1) ;      
+    tmp_staple1 += Cshift(tmp_staple22,mp[mu][1],-1) ;      
+    tmp_staple1 += Cshift(tmp_staple23,mp[mu][2],-1) ;      
+    
+    pokeLorentz(u_smr, 0.1*tmp_staple1, mu); 
   }
 }
 

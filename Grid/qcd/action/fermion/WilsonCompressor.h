@@ -484,6 +484,11 @@ public:
     this->face_table_computed=1;
     assert(this->u_comm_offset==this->_unified_buffer_size);
     accelerator_barrier();
+#ifdef NVLINK_GET
+    this->_grid->StencilBarrier(); // He can now get mu local gather, I can get his
+    // Synch shared memory on a single nodes; could use an asynchronous barrier here and defer check
+    // Or issue barrier AFTER the DMA is running
+#endif    
   }
 
 };

@@ -51,7 +51,7 @@ private:
   }
 
   std::array<GaugeLinkField*,Nd> ust ;
-  std::array<GaugeLinkField*,Nd> lst ;
+  std::array<GaugeLinkField*,6> lst ;
   GaugeLinkField *u_tmp1 , *u_tmp2 ;
   GaugeLinkField *sh1 , *sh2 ;
   GaugeLinkField *temp_Sigma ;
@@ -63,6 +63,8 @@ private:
     std::cout<<"ALLOCATING SMEARED TEMP FIELDS *****"<<std::endl ;
     for( int mu = 0 ; mu < Nd ; mu++ ) {
       ust[mu] = new GaugeLinkField( grid ) ;
+    }
+    for( int mu = 0 ; mu < 6 ; mu++ ) {
       lst[mu] = new GaugeLinkField( grid ) ;
     }
     u_tmp1 = new GaugeLinkField( grid ) ;
@@ -77,6 +79,8 @@ private:
     std::cout<<"DESTROYING SMEARED TEMP FIELDS *****"<<std::endl ;
     for( int mu = 0 ; mu < Nd ; mu++ ) {
       if( ust[mu] != NULL ) delete ust[mu] ;
+    }
+    for( int mu = 0 ; mu < 6 ; mu++ ) {
       if( lst[mu] != NULL ) delete lst[mu] ;
     }
     if( u_tmp1 != NULL ) delete u_tmp1 ;
@@ -107,25 +111,24 @@ public:
     for (int d = 0; d < Nd; d++) {
       *ust[d] = PeekIndex<LorentzIndex>(U, d);
     }
+    autoView( tmp_staple1_v , (*u_tmp1) , AcceleratorWrite ) ;
+    autoView( tmp_staple2_v , (*u_tmp2) , AcceleratorWrite ) ;
     const int mp[4][3] = { {1,2,3} , {0,2,3} , {0,1,3} , {0,1,2} } ;
     for( int mu = 0 ; mu < Nd ; mu++ ) {
       autoView( umu_v , (*ust[mu]) , AcceleratorRead ) ;
-      autoView( tmp_staple1_v , (*u_tmp1)  , AcceleratorWrite ) ;
-      autoView( tmp_staple2_v , (*u_tmp2)  , AcceleratorWrite ) ;
       int nu = mp[mu][0] ;
       Real rhomu = rho[mu+Nd*nu] ;
       *sh1 = Cshift(*ust[nu],mu,1) ; *sh2 = Cshift(*ust[mu],nu,1) ;
       {
-        autoView( tmp_v         , (*sh1)     , AcceleratorRead ) ;
-        autoView( tmp2_v        , (*sh2)     , AcceleratorRead ) ;
-        autoView( unu_v         , (*ust[nu]) , AcceleratorRead ) ;
+        autoView( tmp_v  , (*sh1)     , AcceleratorRead ) ;
+        autoView( tmp2_v , (*sh2)     , AcceleratorRead ) ;
+        autoView( unu_v  , (*ust[nu]) , AcceleratorRead ) ;
         accelerator_for(ss,unu_v.size(), GaugeField::vector_object::Nsimd(),{
-            tmp_staple1_v[ss] = unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ;
-            tmp_staple2_v[ss] = adj(unu_v[ss])*umu_v[ss]*tmp_v[ss] ;
+            tmp_staple1_v[ss] = rhomu*(unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) );
+            tmp_staple2_v[ss] = rhomu*(adj(unu_v[ss])*umu_v[ss]*tmp_v[ss]) ;
           }) ;
       }
       *u_tmp1 += Cshift(*u_tmp2,nu,-1) ;
-      *temp_Sigma = (*u_tmp1)*rhomu;
       // second orthodir                                                                                            
       nu = mp[mu][1] ;
       rhomu = rho[mu+Nd*nu] ;
@@ -135,12 +138,11 @@ public:
         autoView( tmp2_v        , (*sh2)     , AcceleratorRead ) ;
         autoView( unu_v         , (*ust[nu]) , AcceleratorRead ) ;
         accelerator_for(ss,unu_v.size(), GaugeField::vector_object::Nsimd(),{
-            tmp_staple1_v[ss] = unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ;
-            tmp_staple2_v[ss] = adj(unu_v[ss])*umu_v[ss]*tmp_v[ss] ;
+            tmp_staple1_v[ss] += rhomu*(unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss])) ;
+            tmp_staple2_v[ss]  = rhomu*(adj(unu_v[ss])*umu_v[ss]*tmp_v[ss]) ;
           }) ;
       }
       *u_tmp1 += Cshift(*u_tmp2,nu,-1) ;
-      *temp_Sigma += (*u_tmp1)*rhomu;
       // third othodir                                                                                              
       nu = mp[mu][2] ;
       rhomu = rho[mu+Nd*nu] ;
@@ -150,13 +152,12 @@ public:
         autoView( tmp2_v        , (*sh2)     , AcceleratorRead ) ;
         autoView( unu_v         , (*ust[nu]) , AcceleratorRead ) ;
         accelerator_for(ss,unu_v.size(), GaugeField::vector_object::Nsimd(),{
-            tmp_staple1_v[ss] = unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss]) ;
-            tmp_staple2_v[ss] = adj(unu_v[ss])*umu_v[ss]*tmp_v[ss] ;
+            tmp_staple1_v[ss] += rhomu*(unu_v[ss]*tmp2_v[ss]*adj(tmp_v[ss])) ;
+            tmp_staple2_v[ss]  = rhomu*(adj(unu_v[ss])*umu_v[ss]*tmp_v[ss]) ;
           }) ;
       }
       *u_tmp1 += Cshift(*u_tmp2,nu,-1) ;
-      *temp_Sigma += (*u_tmp1)*rhomu;
-      pokeLorentz(u_smr, *temp_Sigma, mu);
+      pokeLorentz(u_smr, *u_tmp1, mu);
     }
   }
 
