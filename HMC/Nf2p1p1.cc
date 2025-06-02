@@ -10,14 +10,15 @@
 
 NAMESPACE_BEGIN(Grid);
 
-//#define b4008
+#define b4008
 //#define b4068
 //#define b416
 //#define b4238
 //#define b4300
-#define b4333
+//#define b4333
 
 #define L48
+//#define L40
 //#define L32
 //#define L24
 //#define L20
@@ -191,7 +192,12 @@ int main(int argc, char **argv) {
   const Real strange_mass = 0.0725;
   const RealD b           = 1.75; 
   const RealD c           = 0.75;
-  #ifdef L32
+  #ifdef L48
+    const int Nlvl1 = 4 ; // how many of the Hasenbusch terms are on coarsest integrator level
+    const Real light_mass   = 0.002;
+    std::vector<Real> hasenbusch( { 0.0045, 0.0095, 0.018 , 0.028, 0.056, 0.12, 0.25, 0.4, 0.58 } ) ;
+    //std::vector<Real> hasenbusch( { 0.005, 0.011, 0.0225, 0.04, 0.09, 0.19, 0.36, 0.6 } ) ;
+  #elif (defined L32)
     const int Nlvl1 = 3 ; // how many of the Hasenbusch terms are on coarsest integrator level
     const Real light_mass   = 0.004;
     std::vector<Real> hasenbusch( { 0.0075, 0.0125, 0.0225, 0.0475, 0.09, 0.18, 0.36, 0.64 } ) ;
@@ -242,7 +248,11 @@ int main(int argc, char **argv) {
   const Real strange_mass = 0.0425;
   const RealD b           = 1.35;
   const RealD c           = 0.35;
-  #ifdef L32
+  #ifdef L48
+    const int Nlvl1 = 2 ;
+    const Real light_mass   = 0.0026;
+    std::vector<Real> hasenbusch( { 0.009, 0.021, 0.045, 0.15, 0.475 } ) ;  
+  #elif (defined L32)
     const int Nlvl1 = 1 ;
     const Real light_mass   = 0.006;
     std::vector<Real> hasenbusch( { 0.02, 0.05, 0.15, 0.5 } ) ;
@@ -263,7 +273,11 @@ int main(int argc, char **argv) {
   const Real strange_mass = 0.0305;
   const RealD b           = 1.2;
   const RealD c           = 0.2;
-  #ifdef L32
+  #ifdef L40
+  const int Nlvl1 = 1 ; // only the light quark mass is on level1
+  const Real light_mass   = 0.0043;
+  std::vector<Real> hasenbusch( { 0.009 , 0.035, 0.14, 0.4 } ) ;  
+  #elif (defined L32)
     const int Nlvl1 = 0 ; // only the light quark mass is on level1
     const Real light_mass   = 0.008;
     std::vector<Real> hasenbusch( { 0.035, 0.14, 0.4 } ) ;  
@@ -294,17 +308,21 @@ int main(int argc, char **argv) {
 #elif (defined b4333)
   const int Ls            = 4;
   const Real beta         = 4.333;
-  const Real strange_mass = 0.0202;
+  const Real strange_mass = 0.023;
   const RealD b           = 1.16;
   const RealD c           = 0.16;
-#ifdef L48
+  #ifdef L48
     const int Nlvl1 = 0 ;
     const Real light_mass   = 0.003;
     std::vector<Real> hasenbusch( { 0.015, 0.07, 0.15, 0.3 , 0.58 } ) ;  
-#elif (defined L32)
-    const int Nlvl1 = 1 ; // puts 0.015 on level 1
-    const Real light_mass   = 0.0073;
-    std::vector<Real> hasenbusch( { 0.015, 0.07, 0.2, 0.55 } ) ;  
+  #elif (defined L40)
+    const int Nlvl1 = 0 ;
+    const Real light_mass   = 0.006;
+    std::vector<Real> hasenbusch( { 0.025, 0.1, 0.25 , 0.55 } ) ;  
+  #elif (defined L32)
+    const int Nlvl1 = 0 ;
+    const Real light_mass   = 0.0082;
+    std::vector<Real> hasenbusch( { 0.04, 0.1, 0.25, 0.6 } ) ;  
   #else
     #error "L not supported"
   #endif
@@ -388,8 +406,8 @@ int main(int argc, char **argv) {
 
   // could put an intermediate hasenbusch here I suppose ....
 #if (defined b4008)
-  #if (defined L32) || (defined L16) || (defined L20)
-    std::vector<double> EOFAhs = { strange_mass , 0.18 , charm_mass } ;
+  #if (defined L48) || (defined L32) || (defined L16) || (defined L20)
+    std::vector<double> EOFAhs = { strange_mass , 0.16 , charm_mass } ;
   #elif (defined L24)
     std::vector<double> EOFAhs = { strange_mass , 0.2 , charm_mass } ;
   #endif
@@ -437,7 +455,9 @@ int main(int argc, char **argv) {
 #elif (defined b4068)
     Level2.push_back( EOFA[i] );
 #elif (defined b416)
-    #ifdef L32
+    #ifdef L48
+    Level2.push_back( EOFA[i] );
+    #elif(defined L32)
     Level2.push_back( EOFA[i] );
     #else
     Level1.push_back( EOFA[i] );
