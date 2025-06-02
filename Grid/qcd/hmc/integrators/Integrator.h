@@ -107,7 +107,7 @@ public:
     return &filter;
   }
 
-  void update_P(Field& U, int level, double ep) 
+  void update_P(const Field& U, int level, double ep) 
   {
     t_P[level] += ep;
     update_P(P, U, level, ep);
@@ -132,21 +132,21 @@ public:
       }
     }
   } update_P_hireps{};
-
  
-  void update_P(MomentaField& Mom, Field& U, int level, double ep) {
+  //void update_P( MomentaField& Mom, const Field& U, const int level, const double ep) {
+  void update_P( MomentaField& Mom, const Field& U, const int level, const double ep) {
     // input U actually not used in the fundamental case
     // Fundamental updates, include smearing
 
     assert(as.size()==LevelForces.size());
     
     Field level_force(U.Grid()); level_force =Zero();
+    Field force(U.Grid());
+    conformable(U.Grid(), Mom.Grid());
+      
     for (int a = 0; a < as[level].actions.size(); ++a) {
 
       double start_full = usecond();
-      Field force(U.Grid());
-      conformable(U.Grid(), Mom.Grid());
-
       double start_force = usecond();
 
       //MemoryManager::Print();
@@ -445,9 +445,8 @@ public:
         std::cout << GridLogMessage << "refresh [" << level << "][" << actionID << "] "<<name << std::endl;
 
 	as[level].actions.at(actionID)->refresh_timer_start();
-        as[level].actions.at(actionID)->refresh(Smearer, sRNG, pRNG);
+	as[level].actions.at(actionID)->refresh(Smearer, sRNG, pRNG);
 	as[level].actions.at(actionID)->refresh_timer_stop();
-
       }
 
       // Refresh the higher representation actions
@@ -472,12 +471,12 @@ public:
   } S_hireps{};
 
   // Calculate action
-  RealD S(Field& U) 
+  RealD S(const Field& U) 
   {  // here also U not used
     assert(as.size()==LevelForces.size());
     std::cout << GridLogIntegrator << "Integrator action\n";
 
-    RealD H = 0.0 ;
+    RealD H = 0.0 , Hprev = 0.0 ;
     delta_H = 0.0 ;
     
     // Actions
@@ -489,7 +488,8 @@ public:
         // based on the boolean is_smeared in actionID
         std::cout << GridLogMessage << "S [" << level << "][" << actionID << "] action eval " << std::endl;
 	as[level].actions.at(actionID)->S_timer_start();
-        RealD Hterm = as[level].actions.at(actionID)->S(Smearer);
+	RealD Hterm = 0.0 ;
+	Hprev = Hterm = as[level].actions.at(actionID)->S(Smearer);
 	delta_H += Hterm - norms[idx] ;
 	as[level].actions.at(actionID)->S_timer_stop();
         std::cout << GridLogMessage << "S [" << level << "][" << actionID << "] H = " << Hterm << " || dH " << delta_H << std::endl;
@@ -511,19 +511,15 @@ public:
   struct _Sinitial {
     template <class FieldType, class Repr>
     void operator()(std::vector<Action<FieldType>*> repr_set, Repr& Rep, int level, RealD& H) {
-      
       for (int a = 0; a < repr_set.size(); ++a) {
-
         RealD Hterm = repr_set.at(a)->Sinitial(Rep.U);
-
         std::cout << GridLogMessage << "Sinitial Level " << level << " term " << a << " H Hirep = " << Hterm << std::endl;
         H += Hterm;
-
       }
     }
   } Sinitial_hireps{};
 
-  RealD Sinitial(Field& U) 
+  RealD Sinitial(const Field& U) 
   {  // here also U not used
 
     std::cout << GridLogIntegrator << "Integrator initial action\n";
@@ -543,11 +539,10 @@ public:
         std::cout << GridLogMessage << "S [" << level << "][" << actionID << "] action eval " << std::endl;
 
 	as[level].actions.at(actionID)->S_timer_start();
-        RealD Hterm = as[level].actions.at(actionID)->S(Smearer);
-	norms[idx] = Hterm ;
+	norms[idx] = as[level].actions.at(actionID)->S(Smearer);
 	as[level].actions.at(actionID)->S_timer_stop();
 
-        H += Hterm;
+        H += norms[idx] ;
 	idx++ ;
       }
       as[level].apply(Sinitial_hireps, Representations, level, H);
