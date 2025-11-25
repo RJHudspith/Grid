@@ -87,7 +87,6 @@ public:
   Smear_Stout(double rho = 1.0, int orthogdim = -1)
   : OrthogDim{orthogdim}, SmearRho{ rho3D(rho,orthogdim) }, OwnedBase{ new Smear_APE<Gimpl>(SmearRho) }, SmearBase{OwnedBase.get()} {
     GRID_ASSERT(Nc == 3 && "Stout smearing currently implemented only for Nc==3");
->>>>>>> upstream/develop
   }
 
   ~Smear_Stout() {}  // delete SmearBase...

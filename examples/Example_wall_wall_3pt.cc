@@ -58,7 +58,7 @@ void MakePhase(Coordinate mom,LatticeComplex &phase)
 }
 void LinkSmear(int nstep, RealD rho,LatticeGaugeField &Uin,LatticeGaugeField &Usmr)
 {
-  Smear_Stout<GimplR> Stout(rho);
+  Smear_Stout<GimplR> Stout(rho,Uin.Grid());
   LatticeGaugeField Utmp(Uin.Grid());
   Utmp = Uin;
   for(int i=0;i<nstep;i++){
