@@ -83,6 +83,13 @@ public:
     assert(Nc<4 && "Stout smearing currently implemented only for Nc==2 or 3");
   }
 
+  /*! Default constructor. rho is constant in all directions, optionally except for orthogonal dimension */
+  Smear_Stout(double rho = 1.0, int orthogdim = -1)
+  : OrthogDim{orthogdim}, SmearRho{ rho3D(rho,orthogdim) }, OwnedBase{ new Smear_APE<Gimpl>(SmearRho) }, SmearBase{OwnedBase.get()} {
+    GRID_ASSERT(Nc == 3 && "Stout smearing currently implemented only for Nc==3");
+>>>>>>> upstream/develop
+  }
+
   ~Smear_Stout() {}  // delete SmearBase...
 
   void smear(GaugeField& u_smr, const GaugeField& U) const {
