@@ -43,7 +43,7 @@ Gamma::Algebra Gmu [] = {
 			 Gamma::Algebra::GammaT
 };
 
-void Benchmark(int Ls, Coordinate Dirichlet);
+void Benchmark(int Ls, Coordinate Dirichlet,bool Sloppy);
 
 int main (int argc, char ** argv)
 {
@@ -69,11 +69,19 @@ int main (int argc, char ** argv)
   std::cout << GridLogMessage<< " Testing with full communication " <<std::endl;
   std::cout << GridLogMessage<< "++++++++++++++++++++++++++++++++++++++++++++++++" <<std::endl;
   
-  Benchmark(Ls,Dirichlet);
+  Benchmark(Ls,Dirichlet,false);
+
+  std::cout << "\n\n\n\n\n\n" <<std::endl;
+  std::cout << GridLogMessage<< "++++++++++++++++++++++++++++++++++++++++++++++++" <<std::endl;
+  std::cout << GridLogMessage<< " Testing with sloppy communication " <<std::endl;
+  std::cout << GridLogMessage<< "++++++++++++++++++++++++++++++++++++++++++++++++" <<std::endl;
+  
+  Benchmark(Ls,Dirichlet,true);
 
   //////////////////
   // Domain decomposed
   //////////////////
+  /*
   Coordinate latt4  = GridDefaultLatt();
   Coordinate mpi    = GridDefaultMpi();
   Coordinate CommDim(Nd);
@@ -81,42 +89,35 @@ int main (int argc, char ** argv)
   GlobalSharedMemory::GetShmDims(mpi,shm);
 
 
-  //////////////////////
-  // Node level
-  //////////////////////
   std::cout << "\n\n\n\n\n\n" <<std::endl;
   std::cout << GridLogMessage<< "++++++++++++++++++++++++++++++++++++++++++++++++" <<std::endl;
-  std::cout << GridLogMessage<< " Testing without internode communication " <<std::endl;
+  //  std::cout << GridLogMessage<< " Testing without internode communication " <<std::endl;
   std::cout << GridLogMessage<< "++++++++++++++++++++++++++++++++++++++++++++++++" <<std::endl;
 
   for(int d=0;d<Nd;d++) CommDim[d]= (mpi[d]/shm[d])>1 ? 1 : 0;
-  //  Dirichlet[0] = 0;
-  //  Dirichlet[1] = CommDim[0]*latt4[0]/mpi[0] * shm[0];
-  //  Dirichlet[2] = CommDim[1]*latt4[1]/mpi[1] * shm[1];
-  //  Dirichlet[3] = CommDim[2]*latt4[2]/mpi[2] * shm[2];
-  //  Dirichlet[4] = CommDim[3]*latt4[3]/mpi[3] * shm[3];
+  Dirichlet[0] = 0;
+  Dirichlet[1] = CommDim[0]*latt4[0]/mpi[0] * shm[0];
+  Dirichlet[2] = CommDim[1]*latt4[1]/mpi[1] * shm[1];
+  Dirichlet[3] = CommDim[2]*latt4[2]/mpi[2] * shm[2];
+  Dirichlet[4] = CommDim[3]*latt4[3]/mpi[3] * shm[3];
 
-  Benchmark(Ls,Dirichlet);
+  Benchmark(Ls,Dirichlet,false);
 
   std::cout << "\n\n\n\n\n\n" <<std::endl;
 
   std::cout << GridLogMessage<< "++++++++++++++++++++++++++++++++++++++++++++++++" <<std::endl;
-  std::cout << GridLogMessage<< " Testing without intranode communication " <<std::endl;
+  std::cout << GridLogMessage<< " Testing with sloppy communication " <<std::endl;
   std::cout << GridLogMessage<< "++++++++++++++++++++++++++++++++++++++++++++++++" <<std::endl;
 
   for(int d=0;d<Nd;d++) CommDim[d]= mpi[d]>1 ? 1 : 0;
-  //  Dirichlet[0] = 0;
-  //  Dirichlet[1] = CommDim[0]*latt4[0]/mpi[0];
-  //  Dirichlet[2] = CommDim[1]*latt4[1]/mpi[1];
-  //  Dirichlet[3] = CommDim[2]*latt4[2]/mpi[2];
-  //  Dirichlet[4] = CommDim[3]*latt4[3]/mpi[3];
   
-  Benchmark(Ls,Dirichlet);
-
+  Benchmark(Ls,Dirichlet,true);
+  */
+  
   Grid_finalize();
   exit(0);
 }
-void Benchmark(int Ls, Coordinate Dirichlet)
+void Benchmark(int Ls, Coordinate Dirichlet,bool sloppy)
 {
   Coordinate latt4 = GridDefaultLatt();
   GridLogLayout();
@@ -132,20 +133,12 @@ void Benchmark(int Ls, Coordinate Dirichlet)
   typedef LatticeGaugeFieldF GaugeField;
   typedef LatticeColourMatrixF ColourMatrixField;
   typedef DomainWallFermionF FermionAction;
-#endif
-#ifdef DOUBLE
+#else
   typedef vComplexD          Simd;
   typedef LatticeFermionD    FermionField;
   typedef LatticeGaugeFieldD GaugeField;
   typedef LatticeColourMatrixD ColourMatrixField;
   typedef DomainWallFermionD FermionAction;
-#endif
-#ifdef DOUBLE2
-  typedef vComplexD2          Simd;
-  typedef LatticeFermionD2    FermionField;
-  typedef LatticeGaugeFieldD2 GaugeField;
-  typedef LatticeColourMatrixD2 ColourMatrixField;
-  typedef DomainWallFermionD2 FermionAction;
 #endif
   
   GridCartesian         * UGrid   = SpaceTimeGrid::makeFourDimGrid(GridDefaultLatt(), GridDefaultSimd(Nd,Simd::Nsimd()),GridDefaultMpi());
@@ -269,6 +262,7 @@ void Benchmark(int Ls, Coordinate Dirichlet)
   FermionAction::ImplParams p;
   p.dirichlet=Dirichlet;
   FermionAction Dw(Umu,*FGrid,*FrbGrid,*UGrid,*UrbGrid,mass,M5,p);
+  Dw.SloppyComms(sloppy);
   Dw.ImportGauge(Umu);
   
   int ncall =300;
@@ -318,7 +312,7 @@ void Benchmark(int Ls, Coordinate Dirichlet)
       FGrid->Barrier();
       exit(-1);
     }
-    assert (n2e< 1.0e-4 );
+    GRID_ASSERT (n2e< 1.0e-4 );
   }
 
   if (1)
@@ -376,7 +370,7 @@ void Benchmark(int Ls, Coordinate Dirichlet)
   n2e= norm2(err);
   std::cout<<GridLogMessage << "norm dag diff   "<< n2e<< "  Line "<<__LINE__ <<std::endl;
 
-  assert((n2e)<1.0e-4);
+  GRID_ASSERT((n2e)<1.0e-4);
   
   FermionField src_e (FrbGrid);
   FermionField src_o (FrbGrid);
@@ -435,13 +429,13 @@ void Benchmark(int Ls, Coordinate Dirichlet)
   err = r_eo-result;
   n2e= norm2(err);
   std::cout<<GridLogMessage << "norm diff   "<< n2e<<std::endl;
-  assert(n2e<1.0e-4);
+  GRID_ASSERT(n2e<1.0e-4);
 
   pickCheckerboard(Even,src_e,err);
   pickCheckerboard(Odd,src_o,err);
   std::cout<<GridLogMessage << "norm diff even  "<< norm2(src_e)<<std::endl;
   std::cout<<GridLogMessage << "norm diff odd   "<< norm2(src_o)<<std::endl;
 
-  assert(norm2(src_e)<1.0e-4);
-  assert(norm2(src_o)<1.0e-4);
+  GRID_ASSERT(norm2(src_e)<1.0e-4);
+  GRID_ASSERT(norm2(src_o)<1.0e-4);
 }

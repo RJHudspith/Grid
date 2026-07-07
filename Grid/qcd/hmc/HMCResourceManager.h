@@ -212,7 +212,7 @@ public:
   }
 
   void SetMomentumFilter( MomentumFilterBase<typename ImplementationPolicy::Field> * MomFilter) {
-    assert(have_Filter==false);
+    GRID_ASSERT(have_Filter==false);
     Filter = std::unique_ptr<MomentumFilterBase<typename ImplementationPolicy::Field> >(MomFilter);
     have_Filter = true;
   }
@@ -246,7 +246,7 @@ public:
   void AddRNGs(std::string s = "") {
     // Couple the RNGs to the GridModule tagged by s
     // the default is the first grid registered
-    assert(Grids.size() > 0 && !have_RNG);
+    GRID_ASSERT(Grids.size() > 0 && !have_RNG);
     if (s.empty()) s = Grids.begin()->first;
     std::cout << GridLogDebug << "Adding RNG to grid: " << s << std::endl;
     RNGs.set_pRNG(new GridParallelRNG(GetCartesian(s)));
@@ -258,12 +258,12 @@ public:
   GridSerialRNG& GetSerialRNG() { return RNGs.get_sRNG(); }
 
   GridParallelRNG& GetParallelRNG() {
-    assert(have_RNG);
+    GRID_ASSERT(have_RNG);
     return RNGs.get_pRNG();
   }
 
   void SeedFixedIntegers() {
-    assert(have_RNG);
+    GRID_ASSERT(have_RNG);
     RNGs.seed();
   }
 

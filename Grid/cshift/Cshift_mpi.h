@@ -29,8 +29,12 @@ Author: paboyle <paboyle@ph.ed.ac.uk>
 #ifndef _GRID_CSHIFT_MPI_H_
 #define _GRID_CSHIFT_MPI_H_
 
-
 NAMESPACE_BEGIN(Grid); 
+
+#ifdef GRID_CHECKSUM_COMMS
+extern uint64_t checksum_index;
+#endif
+
 const int Cshift_verbose=0;
 template<class vobj> Lattice<vobj> Cshift(const Lattice<vobj> &rhs,int dimension,int shift)
 {
@@ -45,6 +49,20 @@ template<class vobj> Lattice<vobj> Cshift(const Lattice<vobj> &rhs,int dimension
   // Map to always positive shift modulo global full dimension.
   shift = (shift+fd)%fd;
 
+  if( shift ==0 ) {
+    ret = rhs;
+    return ret;
+  }
+  //
+  // Potential easy fast cases:
+  // Shift is a multiple of the local lattice extent.
+  // Then need only to shift whole subvolumes
+  int L = rhs.Grid()->_ldimensions[dimension];
+  if ( (shift%L )==0 && !rhs.Grid()->CheckerBoarded(dimension) ) {
+    Cshift_simple(ret,rhs,dimension,shift);
+    return ret;
+  }
+  
   ret.Checkerboard() = rhs.Grid()->CheckerBoardDestination(rhs.Checkerboard(),shift,dimension);
         
   // the permute type
@@ -69,6 +87,55 @@ template<class vobj> Lattice<vobj> Cshift(const Lattice<vobj> &rhs,int dimension
   return ret;
 }
 
+template<class vobj> void Cshift_simple(Lattice<vobj>& ret,const Lattice<vobj> &rhs,int dimension,int shift)
+{
+  GridBase *grid=rhs.Grid();
+  int comm_proc, xmit_to_rank, recv_from_rank;
+  
+  int fd              = rhs.Grid()->_fdimensions[dimension];
+  int rd              = rhs.Grid()->_rdimensions[dimension];
+  int ld              = rhs.Grid()->_ldimensions[dimension];
+  int pd              = rhs.Grid()->_processors[dimension];
+  int simd_layout     = rhs.Grid()->_simd_layout[dimension];
+  int comm_dim        = rhs.Grid()->_processors[dimension] >1 ;
+
+  comm_proc = ((shift)/ld)%pd;
+
+  grid->ShiftedRanks(dimension,comm_proc,xmit_to_rank,recv_from_rank);
+  if(comm_dim) {
+
+    int64_t bytes = sizeof(vobj) * grid->oSites();
+
+    autoView(rhs_v , rhs, AcceleratorRead);
+    autoView(ret_v , ret, AcceleratorWrite);
+    void *send_buf  = (void *)&rhs_v[0];
+    void *recv_buf  = (void *)&ret_v[0];
+
+#ifdef ACCELERATOR_AWARE_MPI
+    grid->SendToRecvFrom(send_buf,
+			 xmit_to_rank,
+			 recv_buf,
+			 recv_from_rank,
+			 bytes);
+#else
+    static hostVector<vobj> hrhs; hrhs.resize(grid->oSites());
+    static hostVector<vobj> hret; hret.resize(grid->oSites());
+
+    void *hsend_buf = (void *)&hrhs[0];
+    void *hrecv_buf = (void *)&hret[0];
+
+    acceleratorCopyFromDevice(send_buf,hsend_buf,bytes);
+
+    grid->SendToRecvFrom(hsend_buf,
+			 xmit_to_rank,
+			 hrecv_buf,
+			 recv_from_rank,
+			 bytes);
+
+    acceleratorCopyToDevice(hrecv_buf,recv_buf,bytes);
+#endif
+  }
+}
 template<class vobj> void Cshift_comms(Lattice<vobj>& ret,const Lattice<vobj> &rhs,int dimension,int shift)
 {
   int sshift[2];
@@ -117,17 +184,18 @@ template<class vobj> void Cshift_comms(Lattice<vobj> &ret,const Lattice<vobj> &r
   int pd              = rhs.Grid()->_processors[dimension];
   int simd_layout     = rhs.Grid()->_simd_layout[dimension];
   int comm_dim        = rhs.Grid()->_processors[dimension] >1 ;
-  assert(simd_layout==1);
-  assert(comm_dim==1);
-  assert(shift>=0);
-  assert(shift<fd);
+  GRID_ASSERT(simd_layout==1);
+  GRID_ASSERT(comm_dim==1);
+  GRID_ASSERT(shift>=0);
+  GRID_ASSERT(shift<fd);
   
   int buffer_size = rhs.Grid()->_slice_nblock[dimension]*rhs.Grid()->_slice_block[dimension];
   static deviceVector<vobj> send_buf; send_buf.resize(buffer_size);
   static deviceVector<vobj> recv_buf; recv_buf.resize(buffer_size);
 #ifndef ACCELERATOR_AWARE_MPI
-  static hostVector<vobj> hsend_buf; hsend_buf.resize(buffer_size);
-  static hostVector<vobj> hrecv_buf; hrecv_buf.resize(buffer_size);
+  int pad = (8 + sizeof(vobj) - 1) / sizeof(vobj);
+  static hostVector<vobj> hsend_buf; hsend_buf.resize(buffer_size+pad);
+  static hostVector<vobj> hrecv_buf; hrecv_buf.resize(buffer_size+pad);
 #endif
   
   int cb= (cbmask==0x2)? Odd : Even;
@@ -143,9 +211,11 @@ template<class vobj> void Cshift_comms(Lattice<vobj> &ret,const Lattice<vobj> &r
     int comm_proc = ((x+sshift)/rd)%pd;
     
     if (comm_proc==0) {
+      FlightRecorder::StepLog("Cshift_Copy_plane");
       tcopy-=usecond();
       Copy_plane(ret,rhs,dimension,x,sx,cbmask); 
       tcopy+=usecond();
+      FlightRecorder::StepLog("Cshift_Copy_plane_complete");
     } else {
 
       int words = buffer_size;
@@ -153,9 +223,11 @@ template<class vobj> void Cshift_comms(Lattice<vobj> &ret,const Lattice<vobj> &r
 
       int bytes = words * sizeof(vobj);
 
+      FlightRecorder::StepLog("Cshift_Gather_plane");
       tgather-=usecond();
       Gather_plane_simple (rhs,send_buf,dimension,sx,cbmask);
       tgather+=usecond();
+      FlightRecorder::StepLog("Cshift_Gather_plane_complete");
 
       //      int rank           = grid->_processor;
       int recv_from_rank;
@@ -166,6 +238,7 @@ template<class vobj> void Cshift_comms(Lattice<vobj> &ret,const Lattice<vobj> &r
       tcomms-=usecond();
       grid->Barrier();
 
+      FlightRecorder::StepLog("Cshift_SendRecv");
 #ifdef ACCELERATOR_AWARE_MPI
       grid->SendToRecvFrom((void *)&send_buf[0],
 			   xmit_to_rank,
@@ -175,17 +248,46 @@ template<class vobj> void Cshift_comms(Lattice<vobj> &ret,const Lattice<vobj> &r
 #else
       // bouncy bouncy
       acceleratorCopyFromDevice(&send_buf[0],&hsend_buf[0],bytes);
+
+#ifdef GRID_CHECKSUM_COMMS
+      GRID_ASSERT(bytes % 8 == 0);
+      checksum_index++;
+      uint64_t xsum = checksum_gpu((uint64_t*)&send_buf[0], bytes / 8) ^ (1 + checksum_index);
+      *(uint64_t*)(((char*)&hsend_buf[0]) + bytes) = xsum;
+      bytes += 8;
+#endif
+
       grid->SendToRecvFrom((void *)&hsend_buf[0],
 			   xmit_to_rank,
 			   (void *)&hrecv_buf[0],
 			   recv_from_rank,
 			   bytes);
+
+#ifdef GRID_CHECKSUM_COMMS
+      bytes -= 8;
+      acceleratorCopyToDevice(&hrecv_buf[0],&recv_buf[0],bytes);
+      uint64_t expected_cs = *(uint64_t*)(((char*)&hrecv_buf[0]) + bytes);
+      uint64_t computed_cs = checksum_gpu((uint64_t*)&recv_buf[0], bytes / 8) ^ (1 + checksum_index);
+      std::cout << GridLogComms<< " Cshift: "
+		<<" dim"<<dimension
+		<<" shift "<<shift
+		<< " rank "<< grid->ThisRank()
+		<<" Coor "<<grid->ThisProcessorCoor()
+		<<" send "<<xsum<<" to   "<<xmit_to_rank
+		<<" recv "<<computed_cs<<" from "<<recv_from_rank
+		<<std::endl;
+      GRID_ASSERT(expected_cs == computed_cs);
+#else
       acceleratorCopyToDevice(&hrecv_buf[0],&recv_buf[0],bytes);
 #endif
+
+#endif
+      FlightRecorder::StepLog("Cshift_SendRecv_complete");
 
       xbytes+=bytes;
       grid->Barrier();
       tcomms+=usecond();
+      FlightRecorder::StepLog("Cshift_barrier_complete");
 
       tscatter-=usecond();
       Scatter_plane_simple (ret,recv_buf,dimension,x,cbmask);
@@ -220,10 +322,10 @@ template<class vobj> void  Cshift_comms_simd(Lattice<vobj> &ret,const Lattice<vo
   //	    << " ld "<<ld<<" pd " << pd<<" simd_layout "<<simd_layout 
   //	    << " comm_dim " << comm_dim << " cbmask " << cbmask <<std::endl;
 
-  assert(comm_dim==1);
-  assert(simd_layout==2);
-  assert(shift>=0);
-  assert(shift<fd);
+  GRID_ASSERT(comm_dim==1);
+  GRID_ASSERT(simd_layout==2);
+  GRID_ASSERT(shift>=0);
+  GRID_ASSERT(shift<fd);
 
   RealD tcopy=0.0;
   RealD tgather=0.0;
@@ -249,8 +351,16 @@ template<class vobj> void  Cshift_comms_simd(Lattice<vobj> &ret,const Lattice<vo
     recv_buf_extract[s].resize(buffer_size);
   }
 #ifndef ACCELERATOR_AWARE_MPI
-  hostVector<scalar_object> hsend_buf; hsend_buf.resize(buffer_size);
-  hostVector<scalar_object> hrecv_buf; hrecv_buf.resize(buffer_size);
+#ifdef GRID_CHECKSUM_COMMS
+  buffer_size += (8 + sizeof(vobj) - 1) / sizeof(vobj);
+#endif
+
+  static hostVector<vobj> hsend_buf; hsend_buf.resize(buffer_size);
+  static hostVector<vobj> hrecv_buf; hrecv_buf.resize(buffer_size);
+
+#ifdef GRID_CHECKSUM_COMMS
+  buffer_size -= (8 + sizeof(vobj) - 1) / sizeof(vobj);
+#endif
 #endif
   
   int bytes = buffer_size*sizeof(scalar_object);
@@ -294,7 +404,7 @@ template<class vobj> void  Cshift_comms_simd(Lattice<vobj> &ret,const Lattice<vo
 
       if (nbr_ic) nbr_lane|=inner_bit;
 
-      assert (sx == nbr_ox);
+      GRID_ASSERT (sx == nbr_ox);
 
       if(nbr_proc){
 	grid->ShiftedRanks(dimension,nbr_proc,xmit_to_rank,recv_from_rank); 
@@ -313,12 +423,37 @@ template<class vobj> void  Cshift_comms_simd(Lattice<vobj> &ret,const Lattice<vo
 #else
       // bouncy bouncy
 	acceleratorCopyFromDevice((void *)send_buf_extract_mpi,(void *)&hsend_buf[0],bytes);
+#ifdef GRID_CHECKSUM_COMMS
+	assert(bytes % 8 == 0);
+	checksum_index++;
+	uint64_t xsum = checksum_gpu((uint64_t*)send_buf_extract_mpi, bytes / 8) ^ (1 + checksum_index);
+	*(uint64_t*)(((char*)&hsend_buf[0]) + bytes) = xsum;
+	bytes += 8;
+#endif
 	grid->SendToRecvFrom((void *)&hsend_buf[0],
 			     xmit_to_rank,
 			     (void *)&hrecv_buf[0],
 			     recv_from_rank,
 			     bytes);
+#ifdef GRID_CHECKSUM_COMMS
+	bytes -= 8;
 	acceleratorCopyToDevice((void *)&hrecv_buf[0],(void *)recv_buf_extract_mpi,bytes);
+	uint64_t expected_cs = *(uint64_t*)(((char*)&hrecv_buf[0]) + bytes);
+	uint64_t computed_cs = checksum_gpu((uint64_t*)recv_buf_extract_mpi, bytes / 8) ^ (1 + checksum_index);
+
+	std::cout << GridLogComms<< " Cshift_comms_simd: "
+		<<" dim"<<dimension
+		<<" shift "<<shift
+		<< " rank "<< grid->ThisRank()
+		<<" Coor "<<grid->ThisProcessorCoor()
+		<<" send "<<xsum<<" to   "<<xmit_to_rank
+		<<" recv "<<computed_cs<<" from "<<recv_from_rank
+		<<std::endl;
+	assert(expected_cs == computed_cs);
+#else
+	acceleratorCopyToDevice((void *)&hrecv_buf[0],(void *)recv_buf_extract_mpi,bytes);
+#endif
+
 #endif
 
 	xbytes+=bytes;

@@ -58,7 +58,7 @@ void MakePhase(Coordinate mom,LatticeComplex &phase)
 }
 void LinkSmear(int nstep, RealD rho,LatticeGaugeField &Uin,LatticeGaugeField &Usmr)
 {
-  Smear_Stout<GimplR> Stout(rho);
+  Smear_Stout<GimplR> Stout(rho,Uin.Grid());
   LatticeGaugeField Utmp(Uin.Grid());
   Utmp = Uin;
   for(int i=0;i<nstep;i++){
@@ -157,8 +157,8 @@ void GaussianWallSource(GridParallelRNG &RNG,int tslice,LatticeGaugeField &U,Lat
 }
 void SequentialSource(int tslice,Coordinate &mom,LatticePropagator &spectator,LatticePropagator &source)
 {
-  assert(mom.size()==Nd);
-  assert(mom[Tdir] == 0);
+  GRID_ASSERT(mom.size()==Nd);
+  GRID_ASSERT(mom[Tdir] == 0);
 
   GridBase * grid = spectator.Grid();
 

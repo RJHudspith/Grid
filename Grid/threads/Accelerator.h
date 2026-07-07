@@ -205,7 +205,7 @@ void Lambda6Apply(uint64_t num1, uint64_t num2, uint64_t num3,
 	     cudaGetErrorString( err ));				\
       printf("File %s Line %d\n",__FILE__,__LINE__);			\
       fflush(stdout);							\
-      if (acceleratorAbortOnGpuError) assert(err==cudaSuccess);		\
+      if (acceleratorAbortOnGpuError) GRID_ASSERT(err==cudaSuccess);		\
     }									\
   }
 
@@ -215,8 +215,8 @@ inline void *acceleratorAllocHost(size_t bytes)
   auto err = cudaMallocHost((void **)&ptr,bytes);
   if( err != cudaSuccess ) {
     ptr = (void *) NULL;
-    printf(" cudaMallocHost failed for %d %s \n",bytes,cudaGetErrorString(err));
-    assert(0);
+    printf(" cudaMallocHost failed for %zu %s \n",bytes,cudaGetErrorString(err));
+    GRID_ASSERT(0);
   }
   return ptr;
 }
@@ -226,8 +226,8 @@ inline void *acceleratorAllocShared(size_t bytes)
   auto err = cudaMallocManaged((void **)&ptr,bytes);
   if( err != cudaSuccess ) {
     ptr = (void *) NULL;
-    printf(" cudaMallocManaged failed for %d %s \n",bytes,cudaGetErrorString(err));
-    assert(0);
+    printf(" cudaMallocManaged failed for %zu %s \n",bytes,cudaGetErrorString(err));
+    GRID_ASSERT(0);
   }
   return ptr;
 };
@@ -237,7 +237,7 @@ inline void *acceleratorAllocDevice(size_t bytes)
   auto err = cudaMalloc((void **)&ptr,bytes);
   if( err != cudaSuccess ) {
     ptr = (void *) NULL;
-    printf(" cudaMalloc failed for %d %s \n",bytes,cudaGetErrorString(err));
+    printf(" cudaMalloc failed for %zu %s \n",bytes,cudaGetErrorString(err));
   }
   return ptr;
 };
@@ -276,7 +276,7 @@ inline int  acceleratorIsCommunicable(void *ptr)
   //  int uvm=0;
   //  auto 
   //  cuerr = cuPointerGetAttribute( &uvm, CU_POINTER_ATTRIBUTE_IS_MANAGED, (CUdeviceptr) ptr);
-  //  assert(cuerr == cudaSuccess );
+  //  GRID_ASSERT(cuerr == cudaSuccess );
   //  if(uvm) return 0;
   //  else    return 1;
     return 1;

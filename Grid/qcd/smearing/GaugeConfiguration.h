@@ -112,7 +112,7 @@ protected:
     StoutSmearing->derivative(SigmaK, iLambda, GaugeK);  // derivative of SmearBase
     return SigmaK;
   }
-
+public:
   /*! @brief Returns smeared configuration at level 'Level' */
   const GaugeField &get_smeared_conf(int Level) const
   {
