@@ -616,6 +616,98 @@ smear_nuunrollv2( LatticeGaugeField &u_smr , const LatticeGaugeField &U )
   }
 }
 
+static void
+stout_old( LatticeGaugeField &u_smr, const LatticeGaugeField &U)
+{
+  LatticeColourMatrix tmp(U.Grid()), Umu(U.Grid());
+  std::cout << GridLogDebug << "Stout smearing started\n";
+  smear(u_smr, U);
+  for (int mu = 0; mu < Nd; mu++) {
+    // u_smr = exp(iQ_mu)*U_mu apart from Orthogdim
+    Umu = peekLorentz(U, mu);
+    tmp = peekLorentz(u_smr, mu);
+    exponentiate_iQ_old(tmp, Ta( tmp * adj(Umu)) );
+    pokeLorentz(u_smr, tmp * Umu, mu);
+  }
+  std::cout << GridLogDebug << "Stout smearing completed\n";
+}
+
+// does staple -> exp( Ta( staple * adj( Umu ) ).U
+static void
+exponentiate_iQ_new3( LatticeColourMatrix &staple ,
+		      const LatticeColourMatrix &Umu)
+{
+  {
+    autoView( staple_v , staple , AcceleratorWrite ) ;      
+    autoView( Umu_v    , Umu    , AcceleratorRead ) ;
+    accelerator_for(ss,staple_v.size(), LatticeColourMatrix::vector_object::Nsimd(),{
+	// compute iQ
+	const auto iQ = Ta( staple_v[ss]*adj( Umu_v[ss] ) ) ;
+	staple_v[ss] = 1 ;
+	const auto iQ2 = iQ*iQ ;
+	// sign in c0 from the conventions on the Ta
+	auto u = -imag(trace(iQ2*iQ))*0.3333333333333333148 ;
+	auto w = -real(trace(iQ2))*0.5;
+	auto f0 = 0.3849001794597505244*w ;
+	w = sqrt(w) ;
+	f0 = f0*w ;
+	f0 = acos(u/f0)*0.3333333333333333148;
+	u = w*(0.5773502691896257311)*cos(f0);
+	w = w*sin(f0);
+	auto f2 = timesI( sin(w)/w );
+	auto u2 = u * u;
+	auto w2 = w * w;
+	// set w to cos(w) as the actual value of w is not used after here
+	w = cos(w);
+	const auto emiu = cos(u) - timesI(sin(u));
+	u = 2.*u ;
+	auto e2iu = cos(u) + timesI(sin(u));
+	f0 = e2iu * (u2 - w2) + emiu * ((8.0*u2 * w) + (u * (3.0*u2 + w2) * f2));
+	auto f1 = e2iu*u - emiu * ((u * w) - (3.0*u2 - w2) * f2);
+	f2 = e2iu - emiu * (w + (1.5*u) * f2);
+	w = 1.0 ; 
+	w = w / (9.0 * u2 - w2);  // reals
+	f0 = f0 * w ;
+	f1 = f1 * w ;
+	f2 = f2 * w ;
+	staple_v[ss] = f0*staple_v[ss] + timesMinusI(f1)*iQ - f2*iQ2;
+	// compute product
+	staple_v[ss] = staple_v[ss]*Umu_v[ss] ;
+      });
+  }
+}
+
+static void
+stout_new( LatticeGaugeField &u_smr, const LatticeGaugeField &U)
+{
+  LatticeColourMatrix tmp(U.Grid()), Umu(U.Grid());
+  std::cout << GridLogDebug << "Stout smearing started\n";
+  smear(u_smr, U);
+  for (int mu = 0; mu < Nd; mu++) {
+    // u_smr = exp(iQ_mu)*U_mu apart from Orthogdim
+    Umu = peekLorentz(U, mu);
+    tmp = peekLorentz(u_smr, mu);
+    exponentiate_iQ_new2(tmp, Ta( tmp * adj(Umu)) );
+    pokeLorentz(u_smr, tmp * Umu, mu);
+  }
+  std::cout << GridLogDebug << "Stout smearing completed\n";
+}
+
+static void
+stout_new2( LatticeGaugeField &u_smr, const LatticeGaugeField &U)
+{
+  LatticeColourMatrix tmp(U.Grid()) ;
+  std::cout << GridLogDebug << "Stout smearing started\n";
+  smear(u_smr, U);
+  for (int mu = 0; mu < Nd; mu++) {
+    // u_smr = exp(iQ_mu)*U_mu apart from Orthogdim
+    tmp = peekLorentz(u_smr, mu);
+    exponentiate_iQ_new3( tmp , peekLorentz(U, mu) ) ;
+    pokeLorentz(u_smr, tmp, mu);
+  }
+  std::cout << GridLogDebug << "Stout smearing completed\n";
+}
+
 template <class Gimpl>
 static void derivative( LatticeGaugeField& SigmaTerm,
 			const LatticeGaugeField& iLambda,
@@ -888,7 +980,26 @@ int main (int argc, char ** argv)
     std::cout<<"Norm "<< norm2( PeekIndex<LorentzIndex>(u_smr,mu)
 				- PeekIndex<LorentzIndex>(u_smr2,mu) ) << std::endl ;
       }
+  // do actual stouting
+  start = usecond() ;
+  stout_old( u_smr , Umu ) ;
+  std::cout<<"4D Stout old computation "<< (usecond()-start)/1e3 << std::endl ;
 
+  start = usecond() ;
+  stout_new( u_smr2 , Umu ) ;
+  std::cout<<"4D Stout new computation "<< (usecond()-start)/1e3 << std::endl ;
+  for(int mu = 0 ; mu < Nd ; mu++ ) {
+    std::cout<<"Norm "<< norm2( PeekIndex<LorentzIndex>(u_smr,mu)
+				- PeekIndex<LorentzIndex>(u_smr2,mu) ) << std::endl ;
+  }
+
+  start = usecond() ;
+  stout_new2( u_smr2 , Umu ) ;
+  std::cout<<"4D Stout new2 computation "<< (usecond()-start)/1e3 << std::endl ;
+  for(int mu = 0 ; mu < Nd ; mu++ ) {
+    std::cout<<"Norm "<< norm2( PeekIndex<LorentzIndex>(u_smr,mu)
+				- PeekIndex<LorentzIndex>(u_smr2,mu) ) << std::endl ;
+  }
 
   LatticeGaugeField dU(&Grid) , dU2(&Grid) ;
   start = usecond() ;

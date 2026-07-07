@@ -46,7 +46,12 @@ typedef enum { ForceGradientIntegrator ,
 inline SupportedIntegrator
 IntStringToEnum( const std::string str )
 {
-  if( str == "ForceGradient" ) return ForceGradientIntegrator ;
+  std::cout<<"For fuck's sake here ----> "<<str<<std::endl ;
+  std::cout<<(str == "ForceGradient")<<std::endl ;
+  if( str == "ForceGradient" ) {
+    std::cout<<"Why don't I get here?"<<std::endl ;
+    return ForceGradientIntegrator ;
+  }
   if( str == "OMF2_3StepV"  )  return OMF2_3StepVIntegrator ;
   if( str == "OMF2_3StepP"  )  return OMF2_3StepPIntegrator ;
   if( str == "OMF2_5StepV"  )  return OMF2_5StepVIntegrator ;

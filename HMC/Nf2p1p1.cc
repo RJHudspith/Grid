@@ -10,16 +10,18 @@
 
 NAMESPACE_BEGIN(Grid);
 
-#define b4008
+//#define b4008
 //#define b4068
 //#define b416
-//#define b4238
+#define b4238
 //#define b4300
 //#define b4333
 
-#define L48
+//#define L64
+//#define L48
 //#define L40
-//#define L32
+#define L32
+//#define L28
 //#define L24
 //#define L20
 //#define L16
@@ -75,7 +77,7 @@ NAMESPACE_BEGIN(Grid);
       MaxOuterIterations(maxouterit), 
       SinglePrecGrid4(_sp_grid4),
       SinglePrecGrid5(_sp_grid5),
-      OuterLoopNormMult(100.) 
+      OuterLoopNormMult(10.) 
     { 
     };
 
@@ -195,20 +197,28 @@ int main(int argc, char **argv) {
   #ifdef L48
     const int Nlvl1 = 4 ; // how many of the Hasenbusch terms are on coarsest integrator level
     const Real light_mass   = 0.002;
-    std::vector<Real> hasenbusch( { 0.0045, 0.0095, 0.018 , 0.028, 0.056, 0.12, 0.25, 0.4, 0.58 } ) ;
+    std::vector<Real> hasenbusch( { 0.0043, 0.00875, 0.018 , 0.028, 0.045, 0.1, 0.2, 0.36, 0.58 } ) ;
     //std::vector<Real> hasenbusch( { 0.005, 0.011, 0.0225, 0.04, 0.09, 0.19, 0.36, 0.6 } ) ;
   #elif (defined L32)
     const int Nlvl1 = 3 ; // how many of the Hasenbusch terms are on coarsest integrator level
     const Real light_mass   = 0.004;
     std::vector<Real> hasenbusch( { 0.0075, 0.0125, 0.0225, 0.0475, 0.09, 0.18, 0.36, 0.64 } ) ;
+  #elif (defined L28)
+    const int Nlvl1 = 3 ; // how many of the Hasenbusch terms are on coarsest integrator level
+    const Real light_mass   = 0.0057;
+    std::vector<Real> hasenbusch( { 0.011, 0.0175, 0.0275, 0.045, 0.09, 0.18, 0.4, 0.64 } ) ;
   #elif (defined L24)
     const int Nlvl1 = 2 ;
     const Real light_mass   = 0.009;
     std::vector<Real> hasenbusch( { 0.016, 0.028, 0.045, 0.09, 0.18, 0.4, 0.64 } ) ;
   #elif (defined L20)
-    const int Nlvl1 = 2 ;
-    const Real light_mass   = 0.012;
-    std::vector<Real> hasenbusch( { 0.02, 0.045, 0.08, 0.16, 0.4, 0.64 } ) ;    
+    //const int Nlvl1 = 2 ;
+    //const Real light_mass   = 0.012;
+    //std::vector<Real> hasenbusch( { 0.02, 0.045, 0.08, 0.16, 0.4, 0.64 } ) ;
+    const int Nlvl1 = 1 ;
+    const Real light_mass   = 0.0195;
+    std::vector<Real> hasenbusch( { 0.04, 0.08, 0.16, 0.4, 0.64 } ) ;    
+
   #elif (defined L16)
     const int Nlvl1 = 1 ;
     const Real light_mass   = 0.019;
@@ -222,18 +232,41 @@ int main(int argc, char **argv) {
   const Real strange_mass = 0.056;
   const RealD b           = 1.5; 
   const RealD c           = 0.5;
-  #ifdef L32
+#ifdef L64
+  const Real light_mass   = 0.00175 ;
+  const int Nlvl1 = 4 ;
+  //std::vector<Real> hasenbusch( { 0.005, 0.011, 0.018, 0.033, 0.058, 0.11, 0.23, 0.5 } ) ;
+  // V1 in tests
+  //std::vector<Real> hasenbusch( { 0.005, 0.009, 0.017, 0.033, 0.058, 0.11, 0.23, 0.5 } ) ;
+  // V2 in tests just trying to get the norms ordered
+  //std::vector<Real> hasenbusch( { 0.00425, 0.009, 0.018, 0.033, 0.058, 0.11, 0.23, 0.5 } ) ;
+  // V3 in tests still a little spike around the first mass
+  //std::vector<Real> hasenbusch( { 0.004, 0.0085, 0.017, 0.033, 0.058, 0.11, 0.23, 0.5 } ) ;
+  //std::vector<Real> hasenbusch( { 0.0042, 0.009, 0.017, 0.03, 0.053, 0.12, 0.23, 0.5 } ) ;
+  std::vector<Real> hasenbusch( { 0.0045, 0.01, 0.017, 0.03, 0.053, 0.11, 0.23, 0.5 } ) ;
+#elif (defined L40)
+  const int Nlvl1 = 2 ;
+  const Real light_mass   = 0.0067 ;
+  std::vector<Real> hasenbusch( { 0.014, 0.032, 0.06, 0.17, 0.33, 0.63 } ) ; 
+#elif (defined L32)
+  const int Nlvl1 = 2 ;
+  const Real light_mass   = 0.0067 ;
+  std::vector<Real> hasenbusch( { 0.014, 0.032, 0.06, 0.17, 0.33, 0.63 } ) ;
+  //const Real light_mass   = 0.005 ;
+  //std::vector<Real> hasenbusch( { 0.013, 0.03, 0.06, 0.17, 0.33, 0.63 } ) ;
+  #elif (defined L28)
     const int Nlvl1 = 2 ;
-    const Real light_mass   = 0.005 ;
-    std::vector<Real> hasenbusch( { 0.013, 0.03, 0.06, 0.17, 0.33, 0.63 } ) ;
+    const Real light_mass   = 0.0067 ;
+    std::vector<Real> hasenbusch( { 0.014, 0.032, 0.06, 0.17, 0.33, 0.63 } ) ;
   #elif (defined L24)
     const int Nlvl1 = 2 ;
     const Real light_mass   = 0.010 ;
     std::vector<Real> hasenbusch( { 0.017, 0.035, 0.07, 0.17, 0.33, 0.63 } ) ;
   #elif (defined L20)
     const int Nlvl1 = 2 ;
-    const Real light_mass   = 0.013 ;
-    std::vector<Real> hasenbusch( { 0.035, 0.07, 0.17, 0.33, 0.61 } ) ;
+    const Real light_mass   = 0.0185 ; //0.013 ;
+    std::vector<Real> hasenbusch( { 0.04, 0.07, 0.17, 0.33, 0.61 } ) ;
+    //std::vector<Real> hasenbusch( { 0.035, 0.07, 0.17, 0.33, 0.61 } ) ;
   #elif (defined L16)
     const int Nlvl1 = 2 ;
     const Real light_mass   = 0.022 ;
@@ -245,13 +278,17 @@ int main(int argc, char **argv) {
 #elif (defined b416)
   const int Ls            = 6;
   const Real beta         = 4.160;
-  const Real strange_mass = 0.0425;
+  const Real strange_mass = 0.0415 ; //0.0425;
   const RealD b           = 1.35;
   const RealD c           = 0.35;
   #ifdef L48
     const int Nlvl1 = 2 ;
     const Real light_mass   = 0.0026;
-    std::vector<Real> hasenbusch( { 0.009, 0.021, 0.045, 0.15, 0.475 } ) ;  
+    std::vector<Real> hasenbusch( { 0.009, 0.021, 0.045, 0.15, 0.475 } ) ;
+  #elif (defined L40)
+    const int Nlvl1 = 2 ;
+    const Real light_mass   = 0.0039;
+    std::vector<Real> hasenbusch( { 0.009, 0.021, 0.045, 0.15, 0.475 } ) ;
   #elif (defined L32)
     const int Nlvl1 = 1 ;
     const Real light_mass   = 0.006;
@@ -273,9 +310,13 @@ int main(int argc, char **argv) {
   const Real strange_mass = 0.0305;
   const RealD b           = 1.2;
   const RealD c           = 0.2;
-  #ifdef L40
+#ifdef L48
+  const int Nlvl1 = 2 ; // only the light quark mass is on level1
+  const Real light_mass   = 0.003 ; //0.0045;
+  std::vector<Real> hasenbusch( { 0.005 , 0.009 , 0.035, 0.14, 0.4 } ) ;  
+#elif (defined L40)
   const int Nlvl1 = 1 ; // only the light quark mass is on level1
-  const Real light_mass   = 0.0043;
+  const Real light_mass   = 0.0045;
   std::vector<Real> hasenbusch( { 0.009 , 0.035, 0.14, 0.4 } ) ;  
   #elif (defined L32)
     const int Nlvl1 = 0 ; // only the light quark mass is on level1
@@ -300,8 +341,10 @@ int main(int argc, char **argv) {
     std::vector<Real> hasenbusch( { 0.008, 0.12, 0.35 } ) ;  
   #elif (defined L32)
     const int Nlvl1 = 0 ;
-    const Real light_mass   = 0.008;
-    std::vector<Real> hasenbusch( { 0.03, 0.12, 0.35 } ) ;  
+    //const Real light_mass   = 0.008;
+    //std::vector<Real> hasenbusch( { 0.03, 0.12, 0.35 } ) ;  
+    const Real light_mass   = 0.01;
+    std::vector<Real> hasenbusch( { 0.035, 0.12, 0.35 } ) ;  
   #else
     #error "L not supported"
   #endif
@@ -311,10 +354,14 @@ int main(int argc, char **argv) {
   const Real strange_mass = 0.023;
   const RealD b           = 1.16;
   const RealD c           = 0.16;
-  #ifdef L48
-    const int Nlvl1 = 0 ;
-    const Real light_mass   = 0.003;
-    std::vector<Real> hasenbusch( { 0.015, 0.07, 0.15, 0.3 , 0.58 } ) ;  
+  #ifdef L64
+  const int Nlvl1 = 2 ;
+  const Real light_mass   = 0.0021;
+  std::vector<Real> hasenbusch( { 0.0125, 0.04, 0.08, 0.21 , 0.5 } ) ;
+  #elif (defined L48)
+  const int Nlvl1 = 0 ;
+  const Real light_mass   = 0.003;
+  std::vector<Real> hasenbusch( { 0.015, 0.07, 0.15, 0.3 , 0.58 } ) ;  
   #elif (defined L40)
     const int Nlvl1 = 0 ;
     const Real light_mass   = 0.006;
@@ -357,7 +404,6 @@ int main(int argc, char **argv) {
   GridPtrF -> show_decomposition() ;
   FrbGridF -> show_decomposition() ;
 
-
   // temporarily need a gauge field
   LatticeGaugeField U(GridPtr);
   LatticeGaugeFieldF UF(GridPtrF);
@@ -366,7 +412,8 @@ int main(int argc, char **argv) {
   std::vector<Complex> boundary = {1,1,1,-1};
   FermionAction::ImplParams Params(boundary);
   FermionActionF::ImplParams ParamsF(boundary);
-  
+
+  // TODO test these?
   const double ActionStoppingCondition     = 1e-10;
   const double DerivativeStoppingCondition = 1e-7;
   const double MaxCGIterations             = 30000;
@@ -395,21 +442,35 @@ int main(int argc, char **argv) {
   // Strange/Charm action
   ////////////////////////////////////
   OneFlavourRationalParams OFRp;
+#if 0
   OFRp.lo        = 0.9;
   OFRp.hi        = 3.5;
   OFRp.MaxIter   = 10000;
   OFRp.tolerance = 1.0e-9;
   OFRp.degree    = 3 ;
   OFRp.precision = 50;
-
+#else
+  OFRp.lo        = 0.2;
+  OFRp.hi        = 25;
+  OFRp.MaxIter   = 10000;
+  OFRp.tolerance = 1.0e-9;
+  OFRp.degree    = 8 ;
+  OFRp.precision = 50;
+#endif
   ConjugateGradient<FermionField> ActionCG(ActionStoppingCondition,MaxCGIterations);
 
   // could put an intermediate hasenbusch here I suppose ....
 #if (defined b4008)
-  #if (defined L48) || (defined L32) || (defined L16) || (defined L20)
+  #if (defined L48) || (defined L32) || (defined L16) || (defined L20) || (defined L28)
     std::vector<double> EOFAhs = { strange_mass , 0.16 , charm_mass } ;
   #elif (defined L24)
     std::vector<double> EOFAhs = { strange_mass , 0.2 , charm_mass } ;
+  #endif
+#elif (defined b4068)
+  #if (defined L64)
+    std::vector<double> EOFAhs = { strange_mass , 0.12 , charm_mass } ;
+  #else
+    std::vector<double> EOFAhs = { strange_mass , charm_mass } ;
   #endif
 #elif (defined b416) || (defined b4068) || (defined b4238) || (defined b4300) || (defined b4333)
   std::vector<double> EOFAhs = { strange_mass , charm_mass } ;
@@ -453,11 +514,17 @@ int main(int argc, char **argv) {
       Level1.push_back( EOFA[i] );
     }
 #elif (defined b4068)
+    #if (defined L64)
+    if( i > 0 ) {
+      Level2.push_back( EOFA[i] );
+    } else {
+      Level1.push_back( EOFA[i] );
+    }
+    #else
     Level2.push_back( EOFA[i] );
+    #endif
 #elif (defined b416)
-    #ifdef L48
-    Level2.push_back( EOFA[i] );
-    #elif(defined L32)
+    #if (defined L48) || (defined L40) || (defined L32)
     Level2.push_back( EOFA[i] );
     #else
     Level1.push_back( EOFA[i] );
@@ -466,6 +533,7 @@ int main(int argc, char **argv) {
     Level1.push_back( EOFA[i] );
 #elif (defined b4333)
     Level2.push_back( EOFA[i] );
+    //Level1.push_back( EOFA[i] );
 #endif
   }
 
@@ -486,8 +554,8 @@ int main(int argc, char **argv) {
 
   light_den.push_back( charm_mass ) ;
 #ifdef b4333
-  light_num.push_back(0.55);
-  light_den.push_back(0.55);
+  light_num.push_back(0.5);
+  light_den.push_back(0.5);
 #endif
   light_num.push_back( pv_mass ) ;
 
@@ -521,6 +589,8 @@ int main(int argc, char **argv) {
     // Mixed precision CG for 2f force
     ////////////////////////////////////////////////////////////////////////////
     double DerivativeStoppingConditionLoose = 3e-7;
+    
+    //double DerivativeStoppingConditionLoose = 3e-7;
 
     DenominatorsF.push_back(new FermionActionF(UF,*FGridF,*FrbGridF,*GridPtrF,*GridRBPtrF,light_den[h],M5,b,c, ParamsF));
     LinOpD.push_back(new LinearOperatorD(*Denominators[h]));
