@@ -1,23 +1,23 @@
 <?xml version="1.0"?>
 <grid>
   <HMCparameters>
-    <StartTrajectory>5</StartTrajectory>
-    <Trajectories>50</Trajectories>
+    <StartTrajectory>0</StartTrajectory>
+    <Trajectories>10</Trajectories>
     <MetropolisTest>true</MetropolisTest>
-    <NoMetropolisUntil>20</NoMetropolisUntil>
+    <NoMetropolisUntil>0</NoMetropolisUntil>
     <PerformRandomShift>false</PerformRandomShift>
     <StartingType>TepidStart</StartingType>
-    <Seed>123</Seed>
+    <Seed>4930</Seed>
     <MD>
       <name>
-	<elem>OMF2_5StepV</elem>
+	<elem>ForceGradient</elem>
 	<elem>OMF2_5StepV</elem>
 	<elem>OMF4_11StepV</elem>
       </name>
       <MDsteps>1</MDsteps>
-      <trajL>0.4</trajL>
+      <trajL>4.0</trajL>
       <lvl_sizes>
-	<elem>1</elem>
+	<elem>14</elem>
 	<elem>1</elem>
 	<elem>1</elem>
       </lvl_sizes>

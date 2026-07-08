@@ -90,7 +90,7 @@ public:
   }
 
   ~Smear_Stout() {}  // delete SmearBase...
-
+  
   void smear(GaugeField& u_smr, const GaugeField& U) const {
     GaugeLinkField tmp(U.Grid()), Umu(U.Grid());
     std::cout << GridLogDebug << "Stout smearing started\n";
@@ -104,7 +104,6 @@ public:
       exponentiate_iQ(tmp, Ta( tmp * adj(Umu)) );
       pokeLorentz(u_smr, tmp * Umu, mu);
     }
-    std::cout << GridLogDebug << "Stout smearing completed\n";
   };
 
   void derivative(GaugeField& SigmaTerm,
@@ -134,7 +133,7 @@ public:
           e_iQ = f0*e_iQ + timesMinusI(f1)*iQ_v[ss] ;
 #else
           const auto iQ2 = iQ_v[ss]*iQ_v[ss] ;
-          // sign in c0 from the conventions on the Ta                                                              
+          // sign in c0 from the conventions on the Ta
           auto u = -imag(trace(iQ2*iQ_v[ss]))*0.3333333333333333148 ;
           auto w = -real(trace(iQ2))*0.5;
           auto f0 = 0.3849001794597505244*w ;
@@ -146,7 +145,7 @@ public:
           auto f2 = timesI( sin(w)/w );
           auto u2 = u * u;
           auto w2 = w * w;
-          // set w to cos(w) as the actual value of w is not used after here                                        
+          // set w to cos(w) as the actual value of w is not used after here
           w = cos(w);
           const auto emiu = cos(u) - timesI(sin(u));
 	  u = 2.*u ;
@@ -155,7 +154,7 @@ public:
           auto f1 = e2iu*u - emiu * ((u * w) - (3.0*u2 - w2) * f2);
           f2 = e2iu - emiu * (w + (1.5*u) * f2);
           w = 1.0 ;
-          w = w / (9.0 * u2 - w2);  // reals                                                                        
+          w = w / (9.0 * u2 - w2);  // reals
           f0 = f0 * w ;
           f1 = f1 * w ;
           f2 = f2 * w ;
