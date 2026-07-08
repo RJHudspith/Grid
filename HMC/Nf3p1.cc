@@ -17,15 +17,6 @@ NAMESPACE_BEGIN(Grid);
 //#define b4300
 #define b4333
 
-//#define L64
-//#define L48
-//#define L40
-#define L32
-//#define L28
-//#define L24
-//#define L20
-//#define L16
-
   /*
    * Need a plan for gauge field update for mixed precision in HMC                      (2x speed up)
    *    -- Store the single prec action operator.
@@ -188,46 +179,64 @@ int main(int argc, char **argv) {
   TheHMC.Resources.AddObservable<PlaqObs>();
   //////////////////////////////////////////////
 
+  // keep the charm the same as the other mass trajectory
+  // and use the bare quark mass average at the physical point (sometimes a rough estimate)
+  // based on LO \chi_PT to predict a good SU(3) mass point
+  // e.g. average from the physical point (2*0.002+0.0725)/3 = 0.0255 ~ 425 MeV, seems reasonable
 #ifdef b4008
+  // L = 16 should have m_\pi.L ~ 4.1
   const int Ls            = 10;
   const Real beta         = 4.008;
-  const Real strange_mass = 0.0725;
+  const Real strange_mass = 0.0255;
+  const Real charm_mass   = 11.8*0.0725 ;
   const RealD b           = 1.75; 
   const RealD c           = 0.75;
-  // here we put the "lightest" det on level 1 as we have a strange det also on lvl1
+  const int Nlvl1 = 1 ;
   const Real light_mass   = strange_mass ;
-  std::vector<Real> hasenbusch( { 0.15, 0.3, 0.5 } ) ;
+  std::vector<Real> hasenbusch( { 0.038, 0.09, 0.15, 0.3, 0.5 } ) ;
 #elif (defined b4068)
+  // L = 20 m_\pi.L ~ 4.3
   const int Ls            = 8;
   const Real beta         = 4.068;
-  const Real strange_mass = 0.056;
+  const Real strange_mass = 0.01983;
+  const Real charm_mass   = 11.8*0.056 ;
   const RealD b           = 1.5; 
   const RealD c           = 0.5;
   const Real light_mass   = strange_mass ;
-  std::vector<Real> hasenbusch( { 0.17, 0.33, 0.61 } ) ;  
+  const int Nlvl1 = 1 ;
+  std::vector<Real> hasenbusch( { 0.04, 0.07, 0.17, 0.33, 0.61 } ) ;  
 #elif (defined b416)
+  // L = 24 m_\pi.L ~ 4.0
   const int Ls            = 6;
   const Real beta         = 4.160;
-  const Real strange_mass = 0.0415 ; //0.0425;
+  const Real strange_mass = 0.0147 ;
+  const Real charm_mass   = 11.8*0.0415 ;
   const RealD b           = 1.35;
   const RealD c           = 0.35;
   const Real light_mass   = strange_mass ;
-  std::vector<Real> hasenbusch( { 0.15, 0.5 } ) ;
+  const int Nlvl1 = 0 ;
+  std::vector<Real> hasenbusch( { 0.06, 0.15, 0.5 } ) ;
 #elif (defined b4238)
+  // L = 32 m_\pi.L ~ 4.2
   const int Ls            = 4;
   const Real beta         = 4.238;
-  const Real strange_mass = 0.0305;
+  const Real strange_mass = 0.01067 ;
+  const Real charm_mass   = 11.8*0.0305 ;
   const RealD b           = 1.2;
   const RealD c           = 0.2;
   const Real light_mass   = strange_mass ;
-  std::vector<Real> hasenbusch( { 0.14, 0.4 } ) ;  
+  const int Nlvl1 = 0 ;
+  std::vector<Real> hasenbusch( { 0.055, 0.14, 0.4 } ) ;  
 #elif (defined b4333)
+  // L = 40 m_\pi.L ~ 4.2
   const int Ls            = 4;
   const Real beta         = 4.333;
-  const Real strange_mass = 0.023;
+  const Real strange_mass = 0.00805;
+  const Real charm_mass   = 11.8*0.023 ;
   const RealD b           = 1.16;
   const RealD c           = 0.16;
   const Real light_mass   = strange_mass ;
+  const int Nlvl1 = 0 ;
   std::vector<Real> hasenbusch( { 0.04, 0.1, 0.25, 0.6 } ) ;  
 #else
   exit(1) ;
@@ -235,7 +244,6 @@ int main(int argc, char **argv) {
   // these are universal
   const RealD M5         = 1.0;
   const Real pv_mass     = 1.0;
-  const Real charm_mass  = 11.8*strange_mass ;
   std::cout<<"aml,ams,amc = " << light_mass << " , " << strange_mass << " , " << charm_mass << std::endl ;
   
   auto GridPtr   = TheHMC.Resources.GetCartesian();
@@ -277,14 +285,9 @@ int main(int argc, char **argv) {
   ////////////////////////////////////
   // Collect actions
   ////////////////////////////////////
-#ifdef b4008
   ActionLevel<HMCWrapper::Field> Level1( HMCparams.MD.lvl_sizes[0] , IntStringToEnum( HMCparams.MD.name[0] ) );
   ActionLevel<HMCWrapper::Field> Level2( HMCparams.MD.lvl_sizes[1] , IntStringToEnum( HMCparams.MD.name[1] ) );
   ActionLevel<HMCWrapper::Field> Level3( HMCparams.MD.lvl_sizes[2] , IntStringToEnum( HMCparams.MD.name[2] ) );
-#else
-  ActionLevel<HMCWrapper::Field> Level1( HMCparams.MD.lvl_sizes[0] , IntStringToEnum( HMCparams.MD.name[0] ) );
-  ActionLevel<HMCWrapper::Field> Level2( HMCparams.MD.lvl_sizes[1] , IntStringToEnum( HMCparams.MD.name[1] ) );
-#endif
   
   typedef SchurDiagMooeeOperator<FermionActionF,FermionFieldF> LinearOperatorF;
   typedef SchurDiagMooeeOperator<FermionAction ,FermionField > LinearOperatorD;
@@ -303,27 +306,19 @@ int main(int argc, char **argv) {
   // Strange/Charm action
   ////////////////////////////////////
   OneFlavourRationalParams OFRp;
-#if 0
-  OFRp.lo        = 0.9;
-  OFRp.hi        = 3.5;
-  OFRp.MaxIter   = 10000;
-  OFRp.tolerance = 1.0e-9;
-  OFRp.degree    = 3 ;
-  OFRp.precision = 50;
-#else
   OFRp.lo        = 0.2;
   OFRp.hi        = 25;
   OFRp.MaxIter   = 10000;
   OFRp.tolerance = 1.0e-9;
   OFRp.degree    = 8 ;
   OFRp.precision = 50;
-#endif
   ConjugateGradient<FermionField> ActionCG(ActionStoppingCondition,MaxCGIterations);
 
   // could put an intermediate hasenbusch here I suppose ....
 #if (defined b4008)
-  std::vector<double> EOFAhs = { strange_mass , 0.16 , charm_mass } ;
-  // L=64 \beta=4.068 got a Hasenbusch but in general we don't need to worry
+  std::vector<double> EOFAhs = { strange_mass , 0.12 , charm_mass } ;
+#elif (defined b4068)
+  std::vector<double> EOFAhs = { strange_mass , 0.1  , charm_mass } ;
 #else
   std::vector<double> EOFAhs = { strange_mass , charm_mass } ;
 #endif
@@ -358,8 +353,8 @@ int main(int argc, char **argv) {
     EOFA.push_back( new ExactOneFlavourRatioPseudoFermionAction<FermionImplPolicy>( *Strange_Op_L[i], *Strange_Op_R[i], ActionCG, *ActionCGL[i], *ActionCGR[i], *DerivativeCGL[i], *DerivativeCGR[i], OFRp, true ) );
     EOFA[i] -> is_smeared = true ;
 
-    // only this beta has 3 levels
-#ifdef b4008
+    // only this beta has 3 levels?
+#if (defined b4008) || (defined b4068)
     if( i > 0 ) {
       Level2.push_back( EOFA[i] );
     } else {
@@ -451,36 +446,24 @@ int main(int argc, char **argv) {
     Quotients.push_back (new TwoFlavourEvenOddRatioPseudoFermionAction<FermionImplPolicy>(*Numerators[h],*Denominators[h],*MPCG[h],*ActionMPCG[h],ActionCG));
     Quotients[h] -> is_smeared = true ;
 
-    // put everything apart from the light quark and some hasenbusches on level 2
-#ifdef b4008
-    if( h > 0 ) {
+    if( h > Nlvl1 ) {
       Level2.push_back(Quotients[h]);
     } else {
       Level1.push_back(Quotients[h]);
     }
-#else
-    Level1.push_back(Quotients[h]);
-#endif
   }
 
   /////////////////////////////////////////////////////////////
   // Gauge action
   /////////////////////////////////////////////////////////////
 
-#ifdef b4008
+
   TheHMC.TheAction.push_back(Level1);
   TheHMC.TheAction.push_back(Level2);
   SymanzikGaugeActionR GaugeAction(beta);
   GaugeAction.is_smeared = false ;
   Level3.push_back(&GaugeAction);
   TheHMC.TheAction.push_back(Level3);
-#else
-  TheHMC.TheAction.push_back(Level1);
-  SymanzikGaugeActionR GaugeAction(beta);
-  GaugeAction.is_smeared = false ;
-  Level2.push_back(&GaugeAction);
-  TheHMC.TheAction.push_back(Level2);
-#endif
   std::cout << GridLogMessage << " Action complete "<< std::endl;
 
   /////////////////////////////////////////////////////////////
