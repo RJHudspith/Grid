@@ -62,7 +62,7 @@ NAMESPACE_BEGIN(Grid);
 				    LinearOperatorBase<FieldD> &_Linop_d) :
       Linop_f(_Linop_f), Linop_d(_Linop_d),
       Tolerance(tol), InnerTolerance(tol), MaxInnerIterations(maxinnerit), MaxOuterIterations(maxouterit), SinglePrecGrid(_sp_grid),
-      OuterLoopNormMult(100.), guesser(NULL){ };
+      OuterLoopNormMult(10.), guesser(NULL){ };
 
     void useGuesser(LinearFunction<FieldF> &g){
       guesser = &g;
@@ -137,7 +137,12 @@ NAMESPACE_BEGIN(Grid);
 
       //Inner CG
       std::cout<<GridLogMessage<<"MixedPrecisionConjugateGradient: Outer iteration " << outer_iter << " starting inner CG with tolerance " << inner_tol << std::endl;
-      CG_f.Tolerance = inner_tol;
+      // try to combat roundoff error
+      if( inner_tol < 1E-5 ) {
+	CG_f.Tolerance = 1E-5 ;
+      } else {
+	CG_f.Tolerance = inner_tol;
+      }
       InnerCGtimer.Start();
       CG_f(Linop_f, src_f, sol_f);
       InnerCGtimer.Stop();
